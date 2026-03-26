@@ -1,4 +1,4 @@
-rootProject.name = "SyncAI-Lib-KmpWebRTC"
+rootProject.name = "syncai-lib-kmpwebrtc"
 
 pluginManagement {
     repositories {

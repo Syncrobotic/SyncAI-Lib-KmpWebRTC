@@ -124,7 +124,7 @@ In `gradle/libs.versions.toml`:
 kmp-webrtc = "1.0.0"
 
 [libraries]
-kmp-webrtc = { module = "com.syncrobotic:SyncAI-Lib-KmpWebRTC", version.ref = "kmp-webrtc" }
+kmp-webrtc = { module = "com.syncrobotic:syncai-lib-kmpwebrtc", version.ref = "kmp-webrtc" }
 ```
 
 In your module's `build.gradle.kts`:
@@ -1243,11 +1243,11 @@ export GITHUB_TOKEN=YOUR_GITHUB_TOKEN
 
 ### Published Artifacts
 
-- `SyncAI-Lib-KmpWebRTC-android` - Android AAR
-- `SyncAI-Lib-KmpWebRTC-jvm` - JVM JAR
-- `SyncAI-Lib-KmpWebRTC-js` - JavaScript
-- `SyncAI-Lib-KmpWebRTC-wasm-js` - WebAssembly
-- `SyncAI-Lib-KmpWebRTC-iosarm64` - iOS arm64 (physical device only)
+- `syncai-lib-kmpwebrtc-android` - Android AAR
+- `syncai-lib-kmpwebrtc-jvm` - JVM JAR
+- `syncai-lib-kmpwebrtc-js` - JavaScript
+- `syncai-lib-kmpwebrtc-wasm-js` - WebAssembly
+- `syncai-lib-kmpwebrtc-iosarm64` - iOS arm64 (physical device only)
 
 > **Note**: iOS Simulator artifacts are not published because GoogleWebRTC does not support simulator.
 
