@@ -104,7 +104,7 @@ kotlin {
             // WebRTC - Java bindings for Desktop (macOS/Windows/Linux)
             implementation(webrtcLibs.webrtc.java)
             
-            // 根據作業系統平台添加對應的原生庫
+            // Add platform-specific native library based on OS
             val osName = System.getProperty("os.name").lowercase()
             val osArch = System.getProperty("os.arch").lowercase()
             

@@ -6,33 +6,33 @@ applyTo: "src/**/*.kt"
 
 ## expect/actual Pattern
 
-- `expect` 宣告放在 `src/commonMain/kotlin/com/syncrobotic/webrtc/`
-- `actual` 實作放在對應的平台 source set（`androidMain`、`iosMain`、`jvmMain`、`jsMain`、`wasmJsMain`）
-- 新增 `expect` 時，必須在所有已啟用的平台提供 `actual`
+- `expect` declarations go in `src/commonMain/kotlin/com/syncrobotic/webrtc/`
+- `actual` implementations go in the corresponding platform source set (`androidMain`, `iosMain`, `jvmMain`, `jsMain`, `wasmJsMain`)
+- When adding a new `expect`, you must provide `actual` on all enabled platforms
 
 ## Compose Multiplatform
 
-- UI 元件使用 `@Composable` function，回傳 Controller 物件供外部操控
-- 模式範例：`VideoRenderer(config) → VideoPlayerController`
-- 平台特定的 Composable 用 `expect`/`actual` fun 實作
+- UI components use `@Composable` functions that return Controller objects for external control
+- Pattern example: `VideoRenderer(config) → VideoPlayerController`
+- Platform-specific Composables use `expect`/`actual` fun
 
 ## Source Set Dependencies
 
-- `commonMain`：只能用 KMP 共用依賴（Ktor core、Compose runtime、kotlinx）
-- `androidMain`：可用 Android SDK、ExoPlayer、`webrtcLibs.webrtc.android`
-- `iosMain`：透過 CocoaPods 使用 GoogleWebRTC（`cocoapods { pod("GoogleWebRTC") }`）
-- `jvmMain`：使用 `webrtcLibs.webrtc.java` + 平台原生 JAR
-- `jsMain`：使用瀏覽器原生 API（`external` declarations）
-- 新增依賴一律在 `gradle/libs.versions.toml` 定義，`build.gradle.kts` 中用 `webrtcLibs.xxx` 引用
+- `commonMain`: Only KMP shared dependencies (Ktor core, Compose runtime, kotlinx)
+- `androidMain`: Can use Android SDK, ExoPlayer, `webrtcLibs.webrtc.android`
+- `iosMain`: Uses GoogleWebRTC via CocoaPods (`cocoapods { pod("GoogleWebRTC") }`)
+- `jvmMain`: Uses `webrtcLibs.webrtc.java` + platform native JARs
+- `jsMain`: Uses browser native APIs (`external` declarations)
+- New dependencies must be defined in `gradle/libs.versions.toml` and referenced in `build.gradle.kts` as `webrtcLibs.xxx`
 
 ## State Management
 
-- 使用 `StateFlow` 暴露狀態變化
-- 狀態類別用 `sealed class`（如 `PlayerState`、`AudioPushState`、`WebRTCState`）
-- 非同步操作使用 Kotlin Coroutines
+- Use `StateFlow` to expose state changes
+- State classes use `sealed class` (e.g. `PlayerState`, `AudioPushState`, `WebRTCState`)
+- Asynchronous operations use Kotlin Coroutines
 
 ## Interface Design
 
-- 遵循介面隔離原則：每個 interface 單一職責、小而專注
-- 現有範例：`VideoPlayerController`（播放控制）、`AudioPushController`（音訊推送）、`DataChannelListener`（資料通道事件）
-- 新增 interface 時避免大而全的設計，優先拆分為多個小 interface
+- Follow interface segregation principle: each interface has a single responsibility, small and focused
+- Existing examples: `VideoPlayerController` (playback control), `AudioPushController` (audio push), `DataChannelListener` (data channel events)
+- When adding new interfaces, avoid monolithic designs; prefer splitting into multiple small interfaces
