@@ -26,6 +26,7 @@ SyncAI-Lib-KmpWebRTC is a Kotlin Multiplatform WebRTC client library supporting 
 
 - Language: Kotlin, following `kotlin.code.style=official`
 - JVM target: Java 11
+- **All comments, documentation, and commit messages must be written in English**
 - Use Kotlin Coroutines and StateFlow for asynchronous operations
 - Compose components provided as `@Composable` functions, returning Controllers
 - Architecture pattern: State Machine (sealed class states) + expect/actual platform abstraction, not Redux or Clean Architecture
