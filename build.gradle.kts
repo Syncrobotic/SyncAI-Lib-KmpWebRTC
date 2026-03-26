@@ -163,7 +163,13 @@ android {
 // GitHub Packages publishing configuration
 publishing {
     publications {
-        // Publications are automatically created by kotlin multiplatform plugin
+        // Filter out platforms we don't want to publish
+        val excludedPublications = setOf("iosSimulatorArm64", "js", "wasmJs")
+        publications.matching { it.name in excludedPublications }.configureEach {
+            tasks.withType<PublishToMavenRepository>().matching {
+                it.publication == this@configureEach
+            }.configureEach { enabled = false }
+        }
     }
     repositories {
         maven {
