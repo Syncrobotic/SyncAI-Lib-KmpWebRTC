@@ -5,40 +5,40 @@ description: "Use when working on WebRTC connection logic, signaling (WHEP/WHIP/
 
 ## PeerConnection Lifecycle
 
-1. 建立 `WebRTCClient` 實例
-2. 透過 Signaling（WHEP/WHIP/WebSocket）交換 SDP offer/answer
-3. 處理 ICE candidates（支援 trickle ICE）
-4. 連線建立後接收/發送媒體串流
-5. 關閉時呼叫 `close()` 釋放所有資源
+1. Create a `WebRTCClient` instance
+2. Exchange SDP offer/answer via Signaling (WHEP/WHIP/WebSocket)
+3. Handle ICE candidates (supports trickle ICE)
+4. After connection is established, receive/send media streams
+5. Call `close()` to release all resources when done
 
-## PeerConnectionFactory 策略
+## PeerConnectionFactory Strategy
 
-- **Android**：每個連線建立獨立 Factory（避免 EglContext 衝突），使用 `synchronized` 保護
-- **iOS**：每個連線獨立 Factory，共享 `RTCAudioSession` 用 lock 保護
-- **JVM**：共享單一 Factory，用 reference counting 管理生命週期（refCount 歸零才 dispose）
+- **Android**: Creates a separate Factory per connection (to avoid EglContext conflicts), protected with `synchronized`
+- **iOS**: Creates a separate Factory per connection; shared `RTCAudioSession` protected with lock
+- **JVM**: Shares a single Factory with reference counting (only disposed when refCount reaches 0)
 
 ## Signaling
 
-- `WhepSignaling`：HTTP POST 交換 SDP，PATCH 傳送 ICE candidates，用於接收串流
-- `WhipSignaling`：HTTP POST 交換 SDP，用於發送串流（音訊推送）
-- `WebSocketSignaling`：WebSocket 連線，支援心跳機制，用於自訂後端
-- 所有 signaling 類別都在 `src/commonMain/kotlin/com/syncrobotic/webrtc/signaling/`
+- `WhepSignaling`: HTTP POST for SDP exchange, PATCH for ICE candidates; used for receiving streams
+- `WhipSignaling`: HTTP POST for SDP exchange; used for sending streams (audio push)
+- `WebSocketSignaling`: WebSocket connection with heartbeat mechanism; used for custom backends
+- All signaling classes are in `src/commonMain/kotlin/com/syncrobotic/webrtc/signaling/`
 
 ## Auto-Reconnect
 
-- `StreamRetryHandler` 提供指數退避重試（預設 5 次，1s → 45s）
-- `RetryConfig` 可自訂重試參數
-- 重連邏輯應在 state machine 的 `Error` / `Disconnected` 狀態觸發
+- `StreamRetryHandler` provides exponential backoff retry (default: 5 attempts, 1s → 45s)
+- `RetryConfig` allows custom retry parameters
+- Reconnection logic should trigger in the state machine's `Error` / `Disconnected` states
 
 ## DataChannel
 
-- 支援 text（`send(String)`）和 binary（`sendBinary(ByteArray)`）
-- `DataChannelConfig` 可設定 ordered/unordered、reliable/unreliable
-- 透過 `DataChannelListener` 接收回呼事件
+- Supports text (`send(String)`) and binary (`sendBinary(ByteArray)`)
+- `DataChannelConfig` for ordered/unordered, reliable/unreliable settings
+- Events received via `DataChannelListener` callbacks
 
 ## Error Handling
 
-- 連線/串流錯誤用 sealed class 狀態表達（`PlayerState.Error(message, cause, isRetryable)`）
-- Signaling 層使用自訂 Exception：`WhepException`、`WhipException`、`WebSocketSignalingException`
-- 重試耗盡時拋出 `StreamRetryExhaustedException`
-- 新增錯誤處理時，優先使用 state machine 的 Error 狀態而非直接 throw
+- Connection/streaming errors expressed as sealed class states (`PlayerState.Error(message, cause, isRetryable)`)
+- Signaling layer uses custom Exceptions: `WhepException`, `WhipException`, `WebSocketSignalingException`
+- Throws `StreamRetryExhaustedException` when retries are exhausted
+- When adding error handling, prefer using state machine Error states over direct throw

@@ -16,7 +16,7 @@ It's a Kotlin Multiplatform WebRTC client library for video/audio streaming, aud
 - [Platform Guides](#platform-guides)
 - [API Reference](#api-reference)
 - [Architecture Notes](#architecture-notes)
-- [Roadmap / 待辦事項](#roadmap--待辦事項)
+- [Roadmap](#roadmap)
 - [CI/CD Workflows](#cicd-workflows)
 - [Contributing](#contributing)
 
@@ -1547,9 +1547,9 @@ eglBase.release()
 
 ---
 
-## Roadmap / 待辦事項
+## Roadmap
 
-### Testing Status / 測試狀態
+### Testing Status
 
 | Platform | Video Receive (WHEP) | Audio Send (WHIP) | Data Channel | Stats |
 |----------|---------------------|-------------------|--------------|-------|
@@ -1559,7 +1559,7 @@ eglBase.release()
 | JavaScript | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending |
 | WasmJS | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending |
 
-### Pending Verification / 待驗證項目
+### Pending Verification
 
 | Priority | Category | Task | Platforms |
 |----------|----------|------|-----------|
@@ -1571,13 +1571,13 @@ eglBase.release()
 | 🔴 High | **Stats** | Bitrate calculation accuracy verification | All |
 | 🔴 High | **Stats** | Latency/RTT measurement verification | All |
 
-### Completed Features / 已完成功能
+### Completed Features
 
 - ✅ **WhipSignaling** - WHIP signaling with trickle ICE support
 - ✅ **AudioPushPlayer** - Cross-platform audio push composable
 - ✅ **Video/Audio Streaming** - Verified on Android, iOS, JVM
 
-### Planned Features / 規劃中功能
+### Planned Features
 
 | Priority | Feature | Description |
 |----------|---------|-------------|

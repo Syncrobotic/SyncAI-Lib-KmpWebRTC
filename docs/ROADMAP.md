@@ -5,66 +5,66 @@
 
 ---
 
-## 1. SDK 定位與目標用戶
+## 1. SDK Positioning & Target Users
 
-### 1.1 核心定位
+### 1.1 Core Positioning
 
-**一句話描述**：Kotlin Multiplatform WebRTC SDK，專為 IoT/機器人控制場景設計，讓開發者無需處理 WebRTC 底層複雜度即可實現低延遲串流與雙向通訊。
+**One-liner**: Kotlin Multiplatform WebRTC SDK designed for IoT/robotics control scenarios, enabling developers to achieve low-latency streaming and bidirectional communication without dealing with WebRTC's underlying complexity.
 
-### 1.2 目標用戶
+### 1.2 Target Users
 
-| 用戶類型 | 使用場景 | 優先級 |
-|----------|----------|--------|
-| **IoT/機器人開發者** | 遠端控制、多攝影機監控、雙向語音 | 🔴 P0 |
-| **智慧家庭應用** | 門鈴視訊、監控攝影機即時串流 | 🟡 P1 |
-| **教育/培訓平台** | 遠端實驗室、設備操作教學 | 🟡 P1 |
-| **工業自動化** | AGV 監控、產線視訊即時回傳 | 🟢 P2 |
+| User Type | Use Case | Priority |
+|-----------|----------|----------|
+| **IoT/Robotics Developers** | Remote control, multi-camera monitoring, bidirectional voice | 🔴 P0 |
+| **Smart Home Applications** | Doorbell video, security camera live streaming | 🟡 P1 |
+| **Education/Training Platforms** | Remote labs, equipment operation teaching | 🟡 P1 |
+| **Industrial Automation** | AGV monitoring, production line video feedback | 🟢 P2 |
 
-### 1.3 與競品差異
+### 1.3 Competitive Differentiation
 
-| 特點 | SyncAI-Lib-KmpWebRTC | WebRTC Native SDK | 其他 KMP 方案 |
-|------|--------------------|--------------------|---------------|
-| 跨平台 | ✅ Android/iOS/JVM (Web 開發中) | ❌ 各平台分開 | 部分支援 |
-| 學習曲線 | 低 (Composable API) | 高 | 中 |
-| 低延遲優化 | ⏳ Preset 規劃中 | 需自行配置 | 不一定有 |
-| Signaling 內建 | ✅ WHEP/WHIP/WebSocket | ❌ 需自行實作 | 部分 |
-| IoT 場景優化 | ✅ 多視訊源、DataChannel | ❌ 通用設計 | ❌ |
+| Feature | SyncAI-Lib-KmpWebRTC | WebRTC Native SDK | Other KMP Solutions |
+|---------|--------------------|--------------------|---------------------|
+| Cross-platform | ✅ Android/iOS/JVM (Web in progress) | ❌ Separate per platform | Partial support |
+| Learning curve | Low (Composable API) | High | Medium |
+| Low-latency optimization | ⏳ Preset planned | Manual configuration | Not guaranteed |
+| Built-in signaling | ✅ WHEP/WHIP/WebSocket | ❌ Must implement yourself | Partial |
+| IoT scenario optimization | ✅ Multi-video sources, DataChannel | ❌ General-purpose design | ❌ |
 
 ---
 
-## 2. 功能規劃
+## 2. Feature Planning
 
-### 2.1 現有功能 (v1.x)
+### 2.1 Current Features (v1.x)
 
-| 功能 | 平台支援 | 狀態 |
-|------|----------|------|
+| Feature | Platform Support | Status |
+|---------|-----------------|--------|
 | Video Receive (WHEP) | Android/iOS/JVM | ✅ Verified |
 | Audio Send (WHIP) | Android/iOS/JVM | ✅ Verified |
 | Audio Receive | Android/iOS/JVM | ✅ Verified |
 | DataChannel (Text) | Android/iOS/JVM | ✅ Implemented |
 | DataChannel (Binary) | Android/iOS/JVM | ✅ Implemented |
 | VideoRenderer Composable | Android/iOS/JVM | ✅ Available |
-| 多 VideoRenderer 同時使用 | Android/iOS/JVM | ✅ Supported (每個實例獨立 PeerConnection，無共享狀態衝突) |
+| Multiple VideoRenderer instances | Android/iOS/JVM | ✅ Supported (each instance has independent PeerConnection, no shared state conflicts) |
 | AudioPushPlayer Composable | Android/iOS/JVM/JS | ✅ Available |
 | BidirectionalPlayer | Android/iOS/JVM | ✅ Available |
-| Web (JS) | Browser | ⚠️ Stub (VideoRenderer 未實作，僅 WebRTCClient + AudioPush 基本可用) |
-| Web (WasmJS) | Browser | ❌ 未完成 (缺少 VideoRenderer、AudioPushPlayer) |
-| 自動重連 | All | ✅ Available |
-| 連線統計 (Stats) | All | ✅ Implemented (需手動呼叫 getStats()，非 StateFlow) |
+| Web (JS) | Browser | ⚠️ Stub (VideoRenderer not implemented, only WebRTCClient + AudioPush basically usable) |
+| Web (WasmJS) | Browser | ❌ Incomplete (missing VideoRenderer, AudioPushPlayer) |
+| Auto-reconnect | All | ✅ Available |
+| Connection Stats | All | ✅ Implemented (requires manual getStats() call, not StateFlow) |
 
-### 2.2 Phase 1: IoT 核心功能
+### 2.2 Phase 1: IoT Core Features
 
-**預計時程**：2-3 週
+**Estimated timeline**: 2-3 weeks
 
-| 功能 | 說明 | 平台 | 優先級 |
-|------|------|------|--------|
-| **VideoPushPlayer** | 從手機攝影機推送視訊 (WHIP) | Android/iOS | 🔴 P0 |
-| **MultiStreamManager** | 便利 API 管理多個視訊來源 (注意：多 VideoRenderer 已可手動組合使用) | All | 🟡 P1 |
-| **低延遲 Preset** | 預設配置: UDP only, 停用 jitter buffer | All | 🔴 P0 |
-| **網路品質即時監控** | RTT/丟包率/Bitrate StateFlow | All | 🔴 P0 |
-| **CameraCapturer** | 跨平台攝影機擷取抽象 | Android/iOS | 🔴 P0 |
+| Feature | Description | Platform | Priority |
+|---------|-------------|----------|----------|
+| **VideoPushPlayer** | Push video from phone camera (WHIP) | Android/iOS | 🔴 P0 |
+| **MultiStreamManager** | Convenience API for managing multiple video sources (Note: multiple VideoRenderers can already be manually composed) | All | 🟡 P1 |
+| **Low-latency Preset** | Default config: UDP only, disable jitter buffer | All | 🔴 P0 |
+| **Real-time Network Quality Monitoring** | RTT/Packet loss/Bitrate StateFlow | All | 🔴 P0 |
+| **CameraCapturer** | Cross-platform camera capture abstraction | Android/iOS | 🔴 P0 |
 
-#### 2.2.1 VideoPushPlayer API 設計
+#### 2.2.1 VideoPushPlayer API Design
 
 ```kotlin
 @Composable
@@ -94,7 +94,7 @@ sealed class VideoPushState {
 }
 ```
 
-#### 2.2.2 MultiStreamManager API 設計
+#### 2.2.2 MultiStreamManager API Design
 
 ```kotlin
 class MultiStreamManager {
@@ -105,14 +105,14 @@ class MultiStreamManager {
     fun reconnect(id: String)
     fun reconnectAll()
     
-    // 取得特定串流的 controller
+    // Get controller for a specific stream
     fun getController(id: String): VideoPlayerController?
     
-    // 整體統計
+    // Aggregated statistics
     val aggregatedStats: StateFlow<AggregatedStats>
 }
 
-// Compose 整合
+// Compose integration
 @Composable
 fun MultiVideoGrid(
     manager: MultiStreamManager,
@@ -121,45 +121,45 @@ fun MultiVideoGrid(
 )
 ```
 
-#### 2.2.3 低延遲配置
+#### 2.2.3 Low-latency Configuration
 
 ```kotlin
 object WebRTCConfig {
-    // 現有
+    // Existing
     val DEFAULT: WebRTCConfig
     val SENDER: WebRTCConfig
     
-    // 新增
+    // New
     val LOW_LATENCY: WebRTCConfig = WebRTCConfig(
         iceTransportPolicy = IceTransportPolicy.ALL,
         bundlePolicy = BundlePolicy.MAX_BUNDLE,
-        // 低延遲專用設定
+        // Low-latency specific settings
         jitterBufferMinMs = 0,
         jitterBufferMaxMs = 100,
         preferredVideoCodec = VideoCodec.H264_BASELINE,
-        enableFec = false,        // 停用 FEC 減少延遲
-        enableNack = true,        // 保留 NACK 處理丟包
-        enableDtx = true          // DTX 節省頻寬
+        enableFec = false,        // Disable FEC to reduce latency
+        enableNack = true,        // Keep NACK for packet loss handling
+        enableDtx = true          // DTX to save bandwidth
     )
 }
 ```
 
-### 2.3 Phase 2: 開發者體驗
+### 2.3 Phase 2: Developer Experience
 
-**預計時程**：1-2 週
+**Estimated timeline**: 1-2 weeks
 
-| 功能 | 說明 | 優先級 |
-|------|------|--------|
-| **Signaling 抽象介面** | 允許用戶實作自定義 signaling | 🔴 P0 |
-| **結構化錯誤系統** | 錯誤碼 + 可恢復性標記 | 🟡 P1 |
-| **可插拔 Logger** | 用戶注入自定義 logger | 🟡 P1 |
-| **自動重連策略增強** | 可配置 backoff 策略 | 🟡 P1 |
-| **Codec 偏好設定** | 優先順序: H264 > VP8 > VP9 | 🟢 P2 |
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Signaling Abstract Interface** | Allow users to implement custom signaling | 🔴 P0 |
+| **Structured Error System** | Error codes + recoverability flags | 🟡 P1 |
+| **Pluggable Logger** | User-injectable custom logger | 🟡 P1 |
+| **Enhanced Auto-reconnect Strategy** | Configurable backoff policies | 🟡 P1 |
+| **Codec Preference Settings** | Priority: H264 > VP8 > VP9 | 🟢 P2 |
 
-#### 2.3.1 Signaling 抽象介面
+#### 2.3.1 Signaling Abstract Interface
 
 ```kotlin
-// 用戶可實作自己的 signaling
+// Users can implement their own signaling
 interface SignalingClient {
     suspend fun sendOffer(offer: String): SignalingResult
     suspend fun sendAnswer(answer: String)
@@ -177,7 +177,7 @@ data class SignalingResult(
     val iceServers: List<IceServer> = emptyList()
 )
 
-// 使用方式
+// Usage
 val customSignaling = MyFirebaseSignaling(roomId = "room-123")
 
 VideoRenderer(
@@ -186,7 +186,7 @@ VideoRenderer(
 )
 ```
 
-#### 2.3.2 結構化錯誤系統
+#### 2.3.2 Structured Error System
 
 ```kotlin
 sealed class WebRTCError(
@@ -195,29 +195,29 @@ sealed class WebRTCError(
     val isRecoverable: Boolean,
     val cause: Throwable? = null
 ) {
-    // 連線錯誤 (WC = WebRTC Connection)
-    class ConnectionTimeout : WebRTCError("WC001", "連線逾時", true)
-    class IceNegotiationFailed : WebRTCError("WC002", "ICE 協商失敗", true)
-    class DtlsHandshakeFailed : WebRTCError("WC003", "DTLS 握手失敗", true)
-    class ConnectionLost : WebRTCError("WC004", "連線中斷", true)
+    // Connection errors (WC = WebRTC Connection)
+    class ConnectionTimeout : WebRTCError("WC001", "Connection timeout", true)
+    class IceNegotiationFailed : WebRTCError("WC002", "ICE negotiation failed", true)
+    class DtlsHandshakeFailed : WebRTCError("WC003", "DTLS handshake failed", true)
+    class ConnectionLost : WebRTCError("WC004", "Connection lost", true)
     
-    // Signaling 錯誤 (WS = WebRTC Signaling)
-    class SignalingTimeout : WebRTCError("WS001", "Signaling 逾時", true)
-    class InvalidSdp(details: String) : WebRTCError("WS002", "無效的 SDP: $details", false)
-    class SignalingServerError(status: Int) : WebRTCError("WS003", "伺服器錯誤: $status", true)
+    // Signaling errors (WS = WebRTC Signaling)
+    class SignalingTimeout : WebRTCError("WS001", "Signaling timeout", true)
+    class InvalidSdp(details: String) : WebRTCError("WS002", "Invalid SDP: $details", false)
+    class SignalingServerError(status: Int) : WebRTCError("WS003", "Server error: $status", true)
     
-    // DataChannel 錯誤 (WD = WebRTC DataChannel)
-    class DataChannelNotOpen : WebRTCError("WD001", "DataChannel 未開啟", false)
-    class MessageTooLarge(size: Int) : WebRTCError("WD002", "訊息過大: $size bytes", false)
+    // DataChannel errors (WD = WebRTC DataChannel)
+    class DataChannelNotOpen : WebRTCError("WD001", "DataChannel not open", false)
+    class MessageTooLarge(size: Int) : WebRTCError("WD002", "Message too large: $size bytes", false)
     
-    // 媒體錯誤 (WM = WebRTC Media)
-    class CameraAccessDenied : WebRTCError("WM001", "攝影機權限被拒", false)
-    class MicrophoneAccessDenied : WebRTCError("WM002", "麥克風權限被拒", false)
-    class CodecNotSupported(codec: String) : WebRTCError("WM003", "不支援的編碼: $codec", false)
+    // Media errors (WM = WebRTC Media)
+    class CameraAccessDenied : WebRTCError("WM001", "Camera access denied", false)
+    class MicrophoneAccessDenied : WebRTCError("WM002", "Microphone access denied", false)
+    class CodecNotSupported(codec: String) : WebRTCError("WM003", "Unsupported codec: $codec", false)
 }
 ```
 
-#### 2.3.3 可插拔 Logger
+#### 2.3.3 Pluggable Logger
 
 ```kotlin
 interface WebRTCLogger {
@@ -228,118 +228,118 @@ interface WebRTCLogger {
     fun error(tag: String, message: String, error: Throwable)
 }
 
-// 全域設定
+// Global configuration
 WebRTCClient.setLogger(object : WebRTCLogger {
     override fun debug(tag: String, message: String) {
-        Timber.tag(tag).d(message)  // 整合 Timber
+        Timber.tag(tag).d(message)  // Integrate with Timber
     }
     // ...
 })
 
-// 或使用內建 logger level
+// Or use built-in logger level
 WebRTCClient.setLogLevel(LogLevel.DEBUG)
 ```
 
-### 2.4 Phase 3: 品質與開源準備
+### 2.4 Phase 3: Quality & Open Source Readiness
 
-**預計時程**：2 週
+**Estimated timeline**: 2 weeks
 
-| 項目 | 說明 | 優先級 |
-|------|------|--------|
-| **Unit Tests** | 核心邏輯測試 (Signaling, Config, State) | 🔴 P0 |
-| **Integration Tests** | 端對端連線測試 | 🟡 P1 |
-| **API 文件** | Dokka 生成 + GitHub Pages | 🔴 P0 |
-| **範例專案** | samples/robot-control | 🔴 P0 |
-| **社群模板** | Issue/PR templates | 🟡 P1 |
-| **CONTRIBUTING.md** | 貢獻指南 | 🟡 P1 |
-| **ARCHITECTURE.md** | 架構設計文件 | 🟢 P2 |
+| Item | Description | Priority |
+|------|-------------|----------|
+| **Unit Tests** | Core logic tests (Signaling, Config, State) | 🔴 P0 |
+| **Integration Tests** | End-to-end connection tests | 🟡 P1 |
+| **API Documentation** | Dokka generation + GitHub Pages | 🔴 P0 |
+| **Sample Projects** | samples/robot-control | 🔴 P0 |
+| **Community Templates** | Issue/PR templates | 🟡 P1 |
+| **CONTRIBUTING.md** | Contribution guide | 🟡 P1 |
+| **ARCHITECTURE.md** | Architecture design document | 🟢 P2 |
 
-### 2.5 Phase 4: 進階功能 (Future)
+### 2.5 Phase 4: Advanced Features (Future)
 
-| 功能 | 說明 | 使用場景 |
-|------|------|----------|
-| **螢幕共享** | Desktop/Mobile 螢幕擷取 | 遠端協作 |
-| **本地錄製** | 錄製串流到檔案 | 存檔/回放 |
-| **Simulcast** | 同時發送多種解析度 | 多人會議 (SFU) |
-| **E2E 加密** | Insertable Streams | 隱私敏感應用 |
-| **AR/VR 支援** | 360 視訊、立體音效 | XR 應用 |
-
----
-
-## 3. 效能目標
-
-### 3.1 延遲目標
-
-| 場景 | 目標延遲 | 說明 |
-|------|----------|------|
-| **本地網路 (LAN)** | < 100ms | WiFi 直連 |
-| **一般網路** | < 300ms | 透過 TURN |
-| **跨國連線** | < 500ms | CDN/Edge Server |
-
-### 3.2 資源使用目標
-
-| 指標 | Android | iOS | JVM |
-|------|---------|-----|-----|
-| **記憶體 (單串流)** | < 50MB | < 50MB | < 100MB |
-| **記憶體 (3 串流)** | < 150MB | < 150MB | < 250MB |
-| **CPU (1080p 接收)** | < 15% | < 15% | < 10% |
-| **CPU (720p 發送)** | < 20% | < 20% | < 15% |
-| **APK/IPA 增量** | < 5MB | < 5MB | N/A |
-
-### 3.3 可靠性目標
-
-| 指標 | 目標 |
-|------|------|
-| **自動重連成功率** | > 95% (網路恢復後) |
-| **連線建立時間** | < 2 秒 (LAN) / < 5 秒 (WAN) |
-| **DataChannel 送達率** | 99.9% (reliable mode) |
+| Feature | Description | Use Case |
+|---------|-------------|----------|
+| **Screen Sharing** | Desktop/Mobile screen capture | Remote collaboration |
+| **Local Recording** | Record streams to file | Archive/playback |
+| **Simulcast** | Send multiple resolutions simultaneously | Multi-party conference (SFU) |
+| **E2E Encryption** | Insertable Streams | Privacy-sensitive applications |
+| **AR/VR Support** | 360 video, spatial audio | XR applications |
 
 ---
 
-## 4. 專案結構規劃
+## 3. Performance Targets
 
-### 4.1 目前結構
+### 3.1 Latency Targets
+
+| Scenario | Target Latency | Description |
+|----------|---------------|-------------|
+| **Local Network (LAN)** | < 100ms | Direct WiFi |
+| **General Network** | < 300ms | Via TURN |
+| **Cross-region** | < 500ms | CDN/Edge Server |
+
+### 3.2 Resource Usage Targets
+
+| Metric | Android | iOS | JVM |
+|--------|---------|-----|-----|
+| **Memory (single stream)** | < 50MB | < 50MB | < 100MB |
+| **Memory (3 streams)** | < 150MB | < 150MB | < 250MB |
+| **CPU (1080p receive)** | < 15% | < 15% | < 10% |
+| **CPU (720p send)** | < 20% | < 20% | < 15% |
+| **APK/IPA size increase** | < 5MB | < 5MB | N/A |
+
+### 3.3 Reliability Targets
+
+| Metric | Target |
+|--------|--------|
+| **Auto-reconnect success rate** | > 95% (after network recovery) |
+| **Connection establishment time** | < 2s (LAN) / < 5s (WAN) |
+| **DataChannel delivery rate** | 99.9% (reliable mode) |
+
+---
+
+## 4. Project Structure Planning
+
+### 4.1 Current Structure
 
 ```
 SyncAI-Lib-KmpWebRTC/
 ├── src/
-│   ├── commonMain/      # 共用程式碼
-│   ├── androidMain/     # Android 實作
-│   ├── iosMain/         # iOS 實作
-│   ├── jvmMain/         # JVM 實作
-│   ├── jsMain/          # JS 實作
-│   └── wasmJsMain/      # WasmJS 實作
+│   ├── commonMain/      # Shared code
+│   ├── androidMain/     # Android implementation
+│   ├── iosMain/         # iOS implementation
+│   ├── jvmMain/         # JVM implementation
+│   ├── jsMain/          # JS implementation
+│   └── wasmJsMain/      # WasmJS implementation
 └── build.gradle.kts
 ```
 
-### 4.2 規劃結構 (模組化)
+### 4.2 Planned Structure (Modularized)
 
 ```
 SyncAI-Lib-KmpWebRTC/
-├── core/                       # 核心 API + 抽象
+├── core/                       # Core API + abstractions
 │   └── src/commonMain/
 │       ├── WebRTCClient.kt
-│       ├── signaling/SignalingClient.kt  (介面)
+│       ├── signaling/SignalingClient.kt  (interface)
 │       └── error/WebRTCError.kt
-├── signaling-whep/             # WHEP 實作 (可選)
-├── signaling-whip/             # WHIP 實作 (可選)
-├── signaling-websocket/        # WebSocket 實作 (可選)
-├── compose-ui/                 # Compose UI 元件 (可選)
+├── signaling-whep/             # WHEP implementation (optional)
+├── signaling-whip/             # WHIP implementation (optional)
+├── signaling-websocket/        # WebSocket implementation (optional)
+├── compose-ui/                 # Compose UI components (optional)
 │   └── src/commonMain/
 │       ├── VideoRenderer.kt
 │       ├── AudioPushPlayer.kt
 │       ├── VideoPushPlayer.kt
 │       └── MultiVideoGrid.kt
-├── samples/                    # 範例專案
+├── samples/                    # Sample projects
 │   ├── minimal-android/
 │   ├── minimal-ios/
 │   ├── minimal-desktop/
-│   └── robot-control/          # 完整範例
+│   └── robot-control/          # Complete example
 ├── docs/
-│   ├── ROADMAP.md              # 本文件
+│   ├── ROADMAP.md              # This document
 │   ├── ARCHITECTURE.md
 │   ├── CONTRIBUTING.md
-│   └── api/                    # Dokka 生成
+│   └── api/                    # Dokka generated
 └── .github/
     ├── ISSUE_TEMPLATE/
     ├── PULL_REQUEST_TEMPLATE.md
@@ -348,30 +348,30 @@ SyncAI-Lib-KmpWebRTC/
 
 ---
 
-## 5. 里程碑
+## 5. Milestones
 
-| 版本 | 預計時間 | 主要內容 |
-|------|----------|----------|
-| **v1.5.0** | +3 週 | VideoPushPlayer, MultiStreamManager, 低延遲 preset |
-| **v1.6.0** | +5 週 | Signaling 抽象介面, 結構化錯誤, Logger |
-| **v2.0.0** | +7 週 | 模組化拆分, API 穩定, 完整文件, 範例專案 |
-| **v2.1.0** | Future | 螢幕共享 |
-| **v2.2.0** | Future | 本地錄製 |
-
----
-
-## 6. 待決定事項
-
-- [ ] 模組化拆分的時機？(v2.0 或更早)
-- [ ] 是否需要支援 Simulcast？
-- [ ] Web 平台 (JS/WasmJS) 的優先級？(目前 JS 為 Stub、WasmJS 未完成)
-- [ ] 是否需要提供後端 signaling server 參考實作？
-- [ ] License 是否維持 MIT？
-- [x] 多 VideoRenderer 同時使用？→ **已支援**，架構上每個實例獨立 PeerConnection，無共享狀態衝突
+| Version | Estimated Time | Key Content |
+|---------|---------------|-------------|
+| **v1.5.0** | +3 weeks | VideoPushPlayer, MultiStreamManager, Low-latency preset |
+| **v1.6.0** | +5 weeks | Signaling abstract interface, Structured errors, Logger |
+| **v2.0.0** | +7 weeks | Modularization, Stable API, Full documentation, Sample projects |
+| **v2.1.0** | Future | Screen sharing |
+| **v2.2.0** | Future | Local recording |
 
 ---
 
-## 7. 參考資源
+## 6. Open Questions
+
+- [ ] When to modularize? (v2.0 or earlier)
+- [ ] Is Simulcast support needed?
+- [ ] Priority for Web platforms (JS/WasmJS)? (JS is currently Stub, WasmJS incomplete)
+- [ ] Should a backend signaling server reference implementation be provided?
+- [ ] Keep MIT license?
+- [x] Multiple VideoRenderer instances? → **Already supported**, each instance has independent PeerConnection with no shared state conflicts
+
+---
+
+## 7. References
 - [WebRTC Standard](https://www.w3.org/TR/webrtc/)
 - [WHEP Draft](https://www.ietf.org/archive/id/draft-murillo-whep-01.html)
 - [WHIP Draft](https://www.ietf.org/archive/id/draft-ietf-wish-whip-01.html)
