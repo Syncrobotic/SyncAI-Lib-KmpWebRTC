@@ -15,6 +15,10 @@ import io.ktor.http.*
  * 
  * @see https://datatracker.ietf.org/doc/draft-ietf-wish-whep/
  */
+@Deprecated(
+    message = "Use WhepSignalingAdapter instead. Will be removed in v3.0.",
+    replaceWith = ReplaceWith("WhepSignalingAdapter(url, auth, httpClient)", "com.syncrobotic.webrtc.signaling.WhepSignalingAdapter")
+)
 class WhepSignaling(
     private val httpClient: HttpClient
 ) {
@@ -162,6 +166,10 @@ class WhepException(
  * 
  * @see https://datatracker.ietf.org/doc/draft-ietf-wish-whip/
  */
+@Deprecated(
+    message = "Use WhipSignalingAdapter instead. Will be removed in v3.0.",
+    replaceWith = ReplaceWith("WhipSignalingAdapter(url, auth, httpClient)", "com.syncrobotic.webrtc.signaling.WhipSignalingAdapter")
+)
 class WhipSignaling(
     private val httpClient: HttpClient
 ) {
