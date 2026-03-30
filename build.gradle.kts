@@ -93,6 +93,20 @@ kotlin {
         
         commonTest.dependencies {
             implementation(webrtcLibs.kotlin.test)
+            implementation(webrtcLibs.kotlinx.coroutines.test)
+        }
+        
+        val jvmTest by getting {
+            dependencies {
+                implementation(webrtcLibs.kotlin.testJunit)
+                implementation(webrtcLibs.ktor.client.mock)
+                implementation(webrtcLibs.ktor.client.cio)
+                
+                // E2E: in-process mock WHEP/WHIP server
+                implementation(webrtcLibs.ktor.server.core)
+                implementation(webrtcLibs.ktor.server.netty)
+                implementation(webrtcLibs.ktor.server.content.negotiation)
+            }
         }
         
         jvmMain.dependencies {
@@ -163,7 +177,13 @@ android {
 // GitHub Packages publishing configuration
 publishing {
     publications {
-        // Publications are automatically created by kotlin multiplatform plugin
+        // Filter out platforms we don't want to publish
+        val excludedPublications = setOf("iosSimulatorArm64", "js", "wasmJs")
+        publications.matching { it.name in excludedPublications }.configureEach {
+            tasks.withType<PublishToMavenRepository>().matching {
+                it.publication == this@configureEach
+            }.configureEach { enabled = false }
+        }
     }
     repositories {
         maven {

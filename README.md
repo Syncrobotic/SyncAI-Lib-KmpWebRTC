@@ -1559,6 +1559,41 @@ eglBase.release()
 | JavaScript | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending |
 | WasmJS | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending |
 
+### Unit Tests (jvmTest)
+
+160 unit tests covering all public API surfaces. Run with:
+
+```bash
+./gradlew jvmTest
+```
+
+| Category | Test File | Count | IDs |
+|----------|-----------|-------|-----|
+| **WHEP Signaling** | `WhepSignalingTest.kt` | 20 | WHEP-01..20 |
+| **WHIP Signaling** | `WhipSignalingTest.kt` | 11 | WHIP-01..11 |
+| RetryConfig | `RetryConfigTest.kt` | 9 | RC-01..09 |
+| WebRTCConfig | `WebRTCConfigTest.kt` | 6 | WC-01..06 |
+| IceServer | `IceServerTest.kt` | 3 | IS-01..03 |
+| WebSocketSignalingConfig | `WebSocketSignalingConfigTest.kt` | 5 | WS-01..05 |
+| ServerEndpoints | `ServerEndpointsTest.kt` | 2 | SE-01..02 |
+| StreamConfig | `StreamConfigTest.kt` | 7 | SC-01..07 |
+| BidirectionalConfig | `BidirectionalConfigTest.kt` | 7 | BC-01..07 |
+| StreamRetryHandler | `StreamRetryHandlerTest.kt` | 14 | SRH-01..14 |
+| AudioPushConfig | `AudioPushConfigTest.kt` | 7 | APC-01..07 |
+| AudioPushState | `AudioPushStateTest.kt` | 10 | APS-01..10 |
+| AudioRetryConfig | `AudioRetryConfigTest.kt` | 3 | ARC-01..03 |
+| PlayerState | `PlayerStateTest.kt` | 11 | PS-01..11 |
+| StreamInfo | `StreamInfoTest.kt` | 8 | SI-01..08 |
+| BidirectionalState | `BidirectionalStateTest.kt` | 6 | BS-01..06 |
+| DataChannelConfig | `DataChannelConfigTest.kt` | 10 | DC-01..08, DCS-01, DLA-01 |
+| WebRTCStats | `WebRTCStatsTest.kt` | 8 | WS-01..08 |
+| AudioData | `AudioDataTest.kt` | 4 | AD-01..04 |
+| Enum Values | `EnumValuesTest.kt` | 9 | EV-01..09 |
+
+> **Note — TEST_SPEC discrepancy:** `APS-03` in [docs/TEST_SPEC.md](docs/TEST_SPEC.md) specifies `Connecting.isActive = true`, but the actual `AudioPushState` code defines `isActive` as `Streaming || Muted` only. Tests follow the **actual code behavior** (`Connecting.isActive = false`).
+
+> **Note — E2E tests:** The 40 E2E tests defined in TEST_SPEC (E2E-WHEP, E2E-WHIP, E2E-DataChannel) are **not yet implemented**. They require in-process `MockSignalingServer`, `ServerPeerConnection`, and `DataChannelEchoHandler` infrastructure. Test dependencies (ktor-server-core, ktor-server-netty) are already configured in `build.gradle.kts`.
+
 ### Pending Verification
 
 | Priority | Category | Task | Platforms |
