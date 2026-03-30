@@ -33,6 +33,10 @@ actual class WhepSession actual constructor(
     private var resourceUrl: String? = null
     private var context: Context? = null
 
+    // DataChannel: configs registered before connect(), created during SDP negotiation
+    private val pendingDataChannelConfigs = mutableListOf<DataChannelConfig>()
+    private val createdDataChannels = mutableMapOf<String, DataChannel>()
+
     /**
      * Internal callback invoked after client initialization in doConnect().
      * Used by session-based VideoRenderer to set up the video rendering surface.
@@ -84,6 +88,7 @@ actual class WhepSession actual constructor(
             "Android Context not set. Call setContext() before connect()."
         )
 
+        createdDataChannels.clear()
         client.initializeWithContext(ctx, config, object : WebRTCListener {
             override fun onConnectionStateChanged(state: WebRTCState) {
                 when (state) {
@@ -122,6 +127,11 @@ actual class WhepSession actual constructor(
         })
 
         onClientReady?.invoke(client, ctx)
+
+        // Create pending DataChannels before SDP offer so they're included in negotiation
+        for (dcConfig in pendingDataChannelConfigs) {
+            client.createDataChannel(dcConfig)?.let { createdDataChannels[dcConfig.label] = it }
+        }
 
         val localSdp = client.createOffer(receiveVideo = true, receiveAudio = true)
 
@@ -164,7 +174,15 @@ actual class WhepSession actual constructor(
     }
 
     actual fun createDataChannel(config: DataChannelConfig): DataChannel? {
-        return client.createDataChannel(config)
+        // If already created during connect(), return the existing channel
+        createdDataChannels[config.label]?.let { return it }
+        // If PC not ready yet, store config to be created before SDP offer
+        if (!client.isConnected && client.connectionState == WebRTCState.NEW) {
+            pendingDataChannelConfigs.add(config)
+            return null
+        }
+        // Post-connect creation (requires renegotiation — may not work with WHIP/WHEP)
+        return client.createDataChannel(config)?.also { createdDataChannels[config.label] = it }
     }
 
     actual fun setAudioEnabled(enabled: Boolean) {

@@ -35,6 +35,10 @@ actual class WhipSession actual constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var muted = false
 
+    // DataChannel: configs registered before connect(), created during SDP negotiation
+    private val pendingDataChannelConfigs = mutableListOf<DataChannelConfig>()
+    private val createdDataChannels = mutableMapOf<String, DataChannel>()
+
     @Volatile
     private var closed = false
 
@@ -66,6 +70,7 @@ actual class WhipSession actual constructor(
     }
 
     private suspend fun doConnect() {
+        createdDataChannels.clear()
         client.initializeForSending(audioConfig.webrtcConfig, object : WebRTCListener {
             override fun onConnectionStateChanged(state: WebRTCState) {
                 when (state) {
@@ -102,6 +107,11 @@ actual class WhipSession actual constructor(
                 }
             }
         })
+
+        // Create pending DataChannels before SDP offer so they're included in negotiation
+        for (dcConfig in pendingDataChannelConfigs) {
+            client.createDataChannel(dcConfig)?.let { createdDataChannels[dcConfig.label] = it }
+        }
 
         val localSdp = client.createSendOffer(sendVideo = false, sendAudio = true)
 
@@ -148,7 +158,15 @@ actual class WhipSession actual constructor(
     }
 
     actual fun createDataChannel(config: DataChannelConfig): DataChannel? {
-        return client.createDataChannel(config)
+        // If already created during connect(), return the existing channel
+        createdDataChannels[config.label]?.let { return it }
+        // If PC not ready yet, store config to be created before SDP offer
+        if (!client.isConnected && client.connectionState == WebRTCState.NEW) {
+            pendingDataChannelConfigs.add(config)
+            return null
+        }
+        // Post-connect creation (requires renegotiation — may not work with WHIP/WHEP)
+        return client.createDataChannel(config)?.also { createdDataChannels[config.label] = it }
     }
 
     actual fun setMuted(muted: Boolean) {
