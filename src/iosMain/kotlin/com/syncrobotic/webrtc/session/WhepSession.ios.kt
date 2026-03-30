@@ -9,6 +9,7 @@ import com.syncrobotic.webrtc.config.WebRTCConfig
 import com.syncrobotic.webrtc.datachannel.DataChannel
 import com.syncrobotic.webrtc.datachannel.DataChannelConfig
 import com.syncrobotic.webrtc.signaling.SignalingAdapter
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
