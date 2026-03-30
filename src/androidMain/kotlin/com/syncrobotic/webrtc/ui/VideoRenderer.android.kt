@@ -41,6 +41,8 @@ actual fun VideoRenderer(
     val context = LocalContext.current
     var surfaceViewRenderer by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
     val sessionState by session.state.collectAsState()
+    val connectionStartTime = remember { System.currentTimeMillis() }
+    var hasReportedFirstFrame by remember { mutableStateOf(false) }
 
     // Set up video rendering callback and auto-connect
     LaunchedEffect(session) {
@@ -53,10 +55,15 @@ actual fun VideoRenderer(
         }
     }
 
-    // Map SessionState → PlayerState
+    // Map SessionState → PlayerState + fire onEvent
     LaunchedEffect(sessionState) {
         val playerState = sessionState.toPlayerState()
         onStateChange?.invoke(playerState)
+        if (sessionState == SessionState.Connected && !hasReportedFirstFrame) {
+            hasReportedFirstFrame = true
+            val elapsed = System.currentTimeMillis() - connectionStartTime
+            onEvent?.invoke(PlayerEvent.FirstFrameRendered(elapsed))
+        }
     }
 
     // Render video or placeholder

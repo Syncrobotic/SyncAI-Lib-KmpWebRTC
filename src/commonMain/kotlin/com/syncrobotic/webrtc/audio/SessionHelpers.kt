@@ -3,6 +3,8 @@ package com.syncrobotic.webrtc.audio
 import com.syncrobotic.webrtc.WebRTCStats
 import com.syncrobotic.webrtc.session.SessionState
 import com.syncrobotic.webrtc.session.WhipSession
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Maps [SessionState] to [AudioPushState].
@@ -23,7 +25,8 @@ internal fun SessionState.toAudioPushState(): AudioPushState = when (this) {
  * An [AudioPushController] backed by a [WhipSession].
  */
 internal class SessionAudioPushController(
-    private val session: WhipSession
+    private val session: WhipSession,
+    private val scope: CoroutineScope
 ) : AudioPushController {
     override val state: AudioPushState
         get() = session.state.value.toAudioPushState()
@@ -32,7 +35,7 @@ internal class SessionAudioPushController(
         get() = session.stats.value
 
     override fun start() {
-        // Session connect is managed by the composable via LaunchedEffect
+        scope.launch { session.connect() }
     }
 
     override fun stop() {

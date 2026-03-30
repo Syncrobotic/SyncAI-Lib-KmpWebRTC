@@ -24,6 +24,8 @@ actual fun VideoRenderer(
     onEvent: ((PlayerEvent) -> Unit)?,
 ): VideoPlayerController {
     val sessionState by session.state.collectAsState()
+    val connectionStartMark = remember { kotlin.time.TimeSource.Monotonic.markNow() }
+    var hasReportedFirstFrame by remember { mutableStateOf(false) }
 
     LaunchedEffect(session) {
         if (session.state.value == SessionState.Idle) {
@@ -33,6 +35,11 @@ actual fun VideoRenderer(
 
     LaunchedEffect(sessionState) {
         onStateChange?.invoke(sessionState.toPlayerState())
+        if (sessionState == SessionState.Connected && !hasReportedFirstFrame) {
+            hasReportedFirstFrame = true
+            val elapsed = connectionStartMark.elapsedNow().inWholeMilliseconds
+            onEvent?.invoke(PlayerEvent.FirstFrameRendered(elapsed))
+        }
     }
 
     SessionVideoPlaceholder(sessionState, modifier)

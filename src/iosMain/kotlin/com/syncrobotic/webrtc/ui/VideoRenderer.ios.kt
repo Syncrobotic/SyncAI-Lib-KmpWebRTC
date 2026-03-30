@@ -16,6 +16,8 @@ import kotlinx.cinterop.*
 import kotlinx.coroutines.launch
 import platform.AVFoundation.*
 import platform.AVKit.*
+import platform.Foundation.NSDate
+import platform.Foundation.timeIntervalSince1970
 import platform.CoreMedia.*
 import platform.Foundation.*
 import platform.UIKit.*
@@ -37,6 +39,8 @@ actual fun VideoRenderer(
 ): VideoPlayerController {
     var videoView by remember { mutableStateOf<RTCMTLVideoView?>(null) }
     val sessionState by session.state.collectAsState()
+    val connectionStartTime = remember { (NSDate().timeIntervalSince1970 * 1000).toLong() }
+    var hasReportedFirstFrame by remember { mutableStateOf(false) }
 
     // Set up video rendering callback and auto-connect
     LaunchedEffect(session) {
@@ -48,9 +52,14 @@ actual fun VideoRenderer(
         }
     }
 
-    // Map SessionState → PlayerState
+    // Map SessionState → PlayerState + fire onEvent
     LaunchedEffect(sessionState) {
         onStateChange?.invoke(sessionState.toPlayerState())
+        if (sessionState == SessionState.Connected && !hasReportedFirstFrame) {
+            hasReportedFirstFrame = true
+            val elapsed = (NSDate().timeIntervalSince1970 * 1000).toLong() - connectionStartTime
+            onEvent?.invoke(PlayerEvent.FirstFrameRendered(elapsed))
+        }
     }
 
     // Render video or placeholder

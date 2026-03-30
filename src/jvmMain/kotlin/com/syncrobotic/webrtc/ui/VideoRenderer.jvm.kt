@@ -43,6 +43,10 @@ actual fun VideoRenderer(
 ): VideoPlayerController {
     var currentFrame by remember { mutableStateOf<ImageBitmap?>(null) }
     val sessionState by session.state.collectAsState()
+    val connectionStartTime = remember { System.currentTimeMillis() }
+    var hasReportedFirstFrame by remember { mutableStateOf(false) }
+    var lastReportedWidth by remember { mutableStateOf(0) }
+    var lastReportedHeight by remember { mutableStateOf(0) }
 
     // Set up video sink and auto-connect
     LaunchedEffect(session) {
@@ -50,6 +54,28 @@ actual fun VideoRenderer(
             client.setVideoSink(object : dev.onvoid.webrtc.media.video.VideoTrackSink {
                 override fun onVideoFrame(frame: NativeVideoFrame) {
                     currentFrame = convertVideoFrameToImageBitmap(frame)
+                    // Fire FirstFrameRendered once
+                    if (!hasReportedFirstFrame) {
+                        hasReportedFirstFrame = true
+                        val elapsed = System.currentTimeMillis() - connectionStartTime
+                        onEvent?.invoke(PlayerEvent.FirstFrameRendered(elapsed))
+                    }
+                    // Fire StreamInfoReceived on resolution change
+                    val w = frame.buffer.width
+                    val h = frame.buffer.height
+                    if (w > 0 && h > 0 && (w != lastReportedWidth || h != lastReportedHeight)) {
+                        lastReportedWidth = w
+                        lastReportedHeight = h
+                        onEvent?.invoke(PlayerEvent.StreamInfoReceived(
+                            StreamInfo(
+                                width = w,
+                                height = h,
+                                protocol = "WebRTC",
+                                codec = "VP8/H264",
+                                fps = client.getCurrentFps()
+                            )
+                        ))
+                    }
                 }
             })
         }

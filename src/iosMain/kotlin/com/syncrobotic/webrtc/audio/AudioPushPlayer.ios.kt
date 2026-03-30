@@ -24,6 +24,7 @@ actual fun AudioPushPlayer(
     autoStart: Boolean,
     onStateChange: ((AudioPushState) -> Unit)?,
 ): AudioPushController {
+    val scope = rememberCoroutineScope()
     val sessionState by session.state.collectAsState()
 
     LaunchedEffect(session, autoStart) {
@@ -40,7 +41,7 @@ actual fun AudioPushPlayer(
         onDispose { /* Session lifecycle managed by user */ }
     }
 
-    return remember(session) { SessionAudioPushController(session) }
+    return remember(session) { SessionAudioPushController(session, scope) }
 }
 
 /**
