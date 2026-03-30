@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.syncrobotic.webrtc.ui
 
 import androidx.compose.runtime.*
@@ -7,26 +9,84 @@ import com.syncrobotic.webrtc.WebRTCClient
 import com.syncrobotic.webrtc.config.StreamConfig
 import com.syncrobotic.webrtc.config.StreamProtocol
 import com.syncrobotic.webrtc.config.StreamRetryHandler
+import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WhepSession
+import cocoapods.GoogleWebRTC.RTCMTLVideoView
 import kotlinx.cinterop.*
 import kotlinx.coroutines.launch
 import platform.AVFoundation.*
 import platform.AVKit.*
+import platform.Foundation.NSDate
+import platform.Foundation.timeIntervalSince1970
 import platform.CoreMedia.*
 import platform.Foundation.*
 import platform.UIKit.*
 import platform.darwin.NSObject
 
 /**
- * iOS implementation of VideoRenderer using AVPlayer + AVPlayerViewController.
- * 
- * Supports:
- * - HLS streaming (native iOS support)
- * - WebRTC streaming (via GoogleWebRTC)
- * - For RTSP: automatically converts to HLS URL (streaming provides both)
- * 
- * Note: iOS AVPlayer doesn't support RTSP natively. 
- * Use HLS endpoint from streaming (port 8888) for iOS.
+ * iOS implementation of session-based VideoRenderer.
+ *
+ * Auto-connects the [WhepSession], creates an [RTCMTLVideoView] via the
+ * session's internal WebRTC client, and maps session state to [PlayerState].
  */
+@OptIn(ExperimentalForeignApi::class)
+@Composable
+actual fun VideoRenderer(
+    session: WhepSession,
+    modifier: Modifier,
+    onStateChange: ((PlayerState) -> Unit)?,
+    onEvent: ((PlayerEvent) -> Unit)?,
+): VideoPlayerController {
+    var videoView by remember { mutableStateOf<RTCMTLVideoView?>(null) }
+    val sessionState by session.state.collectAsState()
+    val connectionStartTime = remember { (NSDate().timeIntervalSince1970 * 1000).toLong() }
+    var hasReportedFirstFrame by remember { mutableStateOf(false) }
+
+    // Set up video rendering callback and auto-connect
+    LaunchedEffect(session) {
+        session.onClientReady = { client ->
+            videoView = client.createVideoView()
+        }
+        if (session.state.value == SessionState.Idle || session.state.value is SessionState.Error) {
+            session.connect()
+        }
+    }
+
+    // Map SessionState → PlayerState + fire onEvent
+    LaunchedEffect(sessionState) {
+        onStateChange?.invoke(sessionState.toPlayerState())
+        if (sessionState == SessionState.Connected && !hasReportedFirstFrame) {
+            hasReportedFirstFrame = true
+            val elapsed = (NSDate().timeIntervalSince1970 * 1000).toLong() - connectionStartTime
+            onEvent?.invoke(PlayerEvent.FirstFrameRendered(elapsed))
+        }
+    }
+
+    // Render video or placeholder
+    val view = videoView
+    if (view != null) {
+        UIKitView(
+            factory = { view },
+            modifier = modifier,
+        )
+    } else {
+        SessionVideoPlaceholder(sessionState, modifier)
+    }
+
+    // Cleanup
+    DisposableEffect(session) {
+        onDispose {
+            session.onClientReady = null
+        }
+    }
+
+    return remember(session) { SessionVideoPlayerController(session) }
+}
+
+/**
+ * iOS implementation of VideoRenderer (legacy config-based API).
+ */
+@Suppress("DEPRECATION")
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 @Composable
 actual fun VideoRenderer(
@@ -443,6 +503,7 @@ private class IOSVideoPlayerController(
         get() = player.timeControlStatus == AVPlayerTimeControlStatusPlaying
 }
 
+@Suppress("DEPRECATION")
 @OptIn(ExperimentalForeignApi::class)
 @Composable
 actual fun rememberVideoPlayerController(config: StreamConfig): VideoPlayerController {

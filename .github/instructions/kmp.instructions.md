@@ -13,7 +13,8 @@ applyTo: "src/**/*.kt"
 ## Compose Multiplatform
 
 - UI components use `@Composable` functions that return Controller objects for external control
-- Pattern example: `VideoRenderer(config) → VideoPlayerController`
+- v2 pattern: `VideoRenderer(session) → VideoPlayerController` (Session-based, not config-based)
+- Legacy pattern (deprecated): `VideoRenderer(config) → VideoPlayerController`
 - Platform-specific Composables use `expect`/`actual` fun
 
 ## Source Set Dependencies
@@ -34,5 +35,6 @@ applyTo: "src/**/*.kt"
 ## Interface Design
 
 - Follow interface segregation principle: each interface has a single responsibility, small and focused
-- Existing examples: `VideoPlayerController` (playback control), `AudioPushController` (audio push), `DataChannelListener` (data channel events)
+- Existing examples: `SignalingAdapter` (SDP exchange), `VideoPlayerController` (playback control), `AudioPushController` (audio push), `DataChannelListener` (data channel events)
+- v2 core types: `WhepSession` (receive), `WhipSession` (send), `SignalingAuth` (authentication)
 - When adding new interfaces, avoid monolithic designs; prefer splitting into multiple small interfaces

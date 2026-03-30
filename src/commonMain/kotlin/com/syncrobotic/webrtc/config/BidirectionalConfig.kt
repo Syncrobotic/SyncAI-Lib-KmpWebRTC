@@ -32,6 +32,9 @@ import com.syncrobotic.webrtc.audio.AudioRetryConfig
  * @param autoStartVideo Whether to auto-start video playback
  * @param autoStartAudio Whether to auto-start audio sending
  */
+@Deprecated(
+    message = "Use VideoRenderer + AudioPushPlayer separately for better flexibility. Will be removed in v3.0."
+)
 data class BidirectionalConfig(
     val videoConfig: StreamConfig,
     val audioConfig: AudioPushConfig? = null,

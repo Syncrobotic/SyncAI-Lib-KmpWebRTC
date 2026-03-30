@@ -9,22 +9,48 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.syncrobotic.webrtc.config.StreamConfig
+import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WhepSession
 
 /**
- * JavaScript (Browser) implementation of VideoRenderer.
- * 
- * Note: For JS/Browser, use native HTML5 video element with WebRTC MediaStream directly.
- * This Composable is provided for API compatibility.
- * 
- * For full JS WebRTC support, use the WebRTCClient directly and attach
- * the MediaStream to an HTML video element:
- * 
- * ```kotlin
- * val stream = client.getVideoSink() as? MediaStream
- * val videoElement = document.getElementById("video") as? HTMLVideoElement
- * videoElement?.srcObject = stream
- * ```
+ * JS implementation of session-based VideoRenderer.
+ * Stub — full browser support not yet implemented.
  */
+@Composable
+actual fun VideoRenderer(
+    session: WhepSession,
+    modifier: Modifier,
+    onStateChange: ((PlayerState) -> Unit)?,
+    onEvent: ((PlayerEvent) -> Unit)?,
+): VideoPlayerController {
+    val sessionState by session.state.collectAsState()
+    val connectionStartTime = remember { kotlin.js.Date.now().toLong() }
+    var hasReportedFirstFrame by remember { mutableStateOf(false) }
+
+    LaunchedEffect(session) {
+        if (session.state.value == SessionState.Idle) {
+            session.connect()
+        }
+    }
+
+    LaunchedEffect(sessionState) {
+        onStateChange?.invoke(sessionState.toPlayerState())
+        if (sessionState == SessionState.Connected && !hasReportedFirstFrame) {
+            hasReportedFirstFrame = true
+            val elapsed = kotlin.js.Date.now().toLong() - connectionStartTime
+            onEvent?.invoke(PlayerEvent.FirstFrameRendered(elapsed))
+        }
+    }
+
+    SessionVideoPlaceholder(sessionState, modifier)
+
+    return remember { JsVideoPlayerController() }
+}
+
+/**
+ * JS implementation of VideoRenderer (legacy config-based API).
+ */
+@Suppress("DEPRECATION")
 @Composable
 actual fun VideoRenderer(
     config: StreamConfig,
@@ -32,7 +58,6 @@ actual fun VideoRenderer(
     onStateChange: OnPlayerStateChange,
     onEvent: OnPlayerEvent
 ) {
-    // For JS, recommend using native HTML video element
     Box(
         modifier = modifier.fillMaxSize().background(Color.Black),
         contentAlignment = Alignment.Center
@@ -81,6 +106,7 @@ private class JsVideoPlayerController : VideoPlayerController {
         get() = _isPlaying
 }
 
+@Suppress("DEPRECATION")
 @Composable
 actual fun rememberVideoPlayerController(config: StreamConfig): VideoPlayerController {
     return remember { JsVideoPlayerController() }

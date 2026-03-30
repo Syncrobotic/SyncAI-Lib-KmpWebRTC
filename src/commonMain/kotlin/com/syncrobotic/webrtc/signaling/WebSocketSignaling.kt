@@ -21,6 +21,9 @@ import kotlinx.serialization.json.Json
  * 3. Send: {"type": "offer", "sdp": "...", "stream": "raw"}
  * 4. Receive: {"type": "answer", "sdp": "...", "stream": "raw", "resourceUrl": "..."}
  */
+@Deprecated(
+    message = "Use SignalingAdapter interface with a custom implementation. Built-in WebSocketSignalingAdapter planned for v2.1. Will be removed in v3.0."
+)
 class WebSocketSignaling(
     private val httpClient: HttpClient,
     private val config: WebSocketSignalingConfig,

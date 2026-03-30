@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.syncrobotic.webrtc.audio
 
 import android.Manifest
@@ -7,6 +9,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.syncrobotic.webrtc.*
+import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WhipSession
 import com.syncrobotic.webrtc.signaling.WhipSignaling
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -16,9 +20,40 @@ import kotlinx.coroutines.*
 private const val TAG = "AudioPushPlayer"
 
 /**
- * Android implementation of AudioPushPlayer.
- * Uses WebRTCClient for audio push via WHIP protocol.
+ * Android implementation of session-based AudioPushPlayer.
  */
+@Composable
+actual fun AudioPushPlayer(
+    session: WhipSession,
+    autoStart: Boolean,
+    onStateChange: ((AudioPushState) -> Unit)?,
+): AudioPushController {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val sessionState by session.state.collectAsState()
+
+    LaunchedEffect(session, autoStart) {
+        session.setContext(context)
+        if (autoStart && (session.state.value == SessionState.Idle || session.state.value is SessionState.Error)) {
+            session.connect()
+        }
+    }
+
+    LaunchedEffect(sessionState) {
+        onStateChange?.invoke(sessionState.toAudioPushState())
+    }
+
+    DisposableEffect(session) {
+        onDispose { /* Session lifecycle managed by user */ }
+    }
+
+    return remember(session) { SessionAudioPushController(session, scope) }
+}
+
+/**
+ * Android implementation of AudioPushPlayer (legacy config-based API).
+ */
+@Suppress("DEPRECATION")
 @Composable
 actual fun AudioPushPlayer(
     config: AudioPushConfig,
@@ -55,6 +90,7 @@ actual fun AudioPushPlayer(
 /**
  * Remember an AudioPushController with automatic lifecycle management.
  */
+@Suppress("DEPRECATION")
 @Composable
 actual fun rememberAudioPushController(
     config: AudioPushConfig,
@@ -84,7 +120,16 @@ actual class AudioPushClient actual constructor(
     actual override fun stop() = impl.stop()
     actual override fun setMuted(muted: Boolean) = impl.setMuted(muted)
     actual override suspend fun refreshStats() = impl.refreshStats()
+    @Deprecated(
+        message = "Use close() instead for consistent naming with Session API. Will be removed in v3.0.",
+        replaceWith = ReplaceWith("close()")
+    )
     actual fun release() = impl.release()
+
+    actual fun close() {
+        @Suppress("DEPRECATION")
+        release()
+    }
 }
 
 /**

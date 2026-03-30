@@ -1,63 +1,51 @@
 package com.syncrobotic.webrtc.audio
 
 import androidx.compose.runtime.Composable
+import com.syncrobotic.webrtc.session.WhipSession
 
 /**
- * Composable function to create and manage an audio push connection.
- * 
- * This function captures audio from the device microphone and streams it
- * to a WHIP endpoint via WebRTC. It handles the full lifecycle including:
- * - Microphone permission (platform-specific)
- * - Audio capture and encoding
- * - WebRTC connection management
- * - WHIP signaling
- * - Automatic cleanup on disposal
- * 
- * Usage:
+ * Composable to manage audio push via a [WhipSession].
+ *
+ * Auto-connects the session (if idle) and maps session state to
+ * [AudioPushState]. The session handles microphone capture, WHIP
+ * signaling, and auto-reconnect internally.
+ *
  * ```kotlin
- * @Composable
- * fun AudioStreamingScreen() {
- *     val config = AudioPushConfig.create(
- *         host = "10.8.100.245",
- *         streamPath = "mobile-audio"
- *     )
- *     
- *     val controller = AudioPushPlayer(
- *         config = config,
- *         autoStart = false,
- *         onStateChange = { state ->
- *             when (state) {
- *                 is AudioPushState.Streaming -> println("Audio streaming")
- *                 is AudioPushState.Error -> println("Error: ${state.message}")
- *                 is AudioPushState.Reconnecting -> println("Reconnecting ${state.attempt}/${state.maxAttempts}")
- *                 else -> {}
- *             }
- *         }
- *     )
- *     
- *     Column {
- *         Text("Status: ${controller.state}")
- *         
- *         Row {
- *             Button(onClick = { controller.start() }) {
- *                 Text("Start")
- *             }
- *             Button(onClick = { controller.stop() }) {
- *                 Text("Stop")
- *             }
- *             Button(onClick = { controller.toggleMute() }) {
- *                 Text(if (controller.isMuted) "Unmute" else "Mute")
- *             }
- *         }
- *     }
- * }
+ * val signaling = WhipSignalingAdapter(url = "https://server/stream/whip")
+ * val session = WhipSession(signaling)
+ *
+ * val controller = AudioPushPlayer(
+ *     session = session,
+ *     autoStart = true,
+ *     onStateChange = { state -> println(state) }
+ * )
  * ```
- * 
+ *
+ * @param session   The WHIP session that manages audio capture and streaming
+ * @param autoStart If true, automatically connect when composed (default: true)
+ * @param onStateChange Optional callback for audio push state changes
+ * @return An [AudioPushController] for mute/unmute and stop
+ */
+@Composable
+expect fun AudioPushPlayer(
+    session: WhipSession,
+    autoStart: Boolean = true,
+    onStateChange: ((AudioPushState) -> Unit)? = null,
+): AudioPushController
+
+/**
+ * Composable function to create and manage an audio push connection
+ * (legacy config-based API).
+ *
  * @param config Configuration for the audio push connection
  * @param autoStart If true, automatically start streaming when composed (default: false)
  * @param onStateChange Callback for state changes
  * @return An [AudioPushController] for managing the connection
  */
+@Deprecated(
+    message = "Use AudioPushPlayer(session: WhipSession, ...) instead. Will be removed in v3.0.",
+    replaceWith = ReplaceWith("AudioPushPlayer(session, autoStart, onStateChange)")
+)
 @Composable
 expect fun AudioPushPlayer(
     config: AudioPushConfig,
@@ -67,14 +55,15 @@ expect fun AudioPushPlayer(
 
 /**
  * Remember an [AudioPushController] with automatic lifecycle management.
- * 
- * This is equivalent to [AudioPushPlayer] but with a more explicit name
- * for users familiar with the `remember*` naming convention.
- * 
+ *
  * @param config Configuration for the audio push connection
  * @param onStateChange Callback for state changes
  * @return An [AudioPushController] for managing the connection
  */
+@Deprecated(
+    message = "Use AudioPushPlayer(session: WhipSession, ...) instead. Will be removed in v3.0.",
+    replaceWith = ReplaceWith("AudioPushPlayer(session)")
+)
 @Composable
 expect fun rememberAudioPushController(
     config: AudioPushConfig,

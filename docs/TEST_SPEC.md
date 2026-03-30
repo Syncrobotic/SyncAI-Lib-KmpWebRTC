@@ -13,6 +13,8 @@
   - [5. Player State & UI Models](#5-player-state--ui-models)
   - [6. DataChannel Config](#6-datachannel-config)
   - [7. WebRTC Data Models](#7-webrtc-data-models)
+- [8. v2 Signaling Adapter](#8-v2-signaling-adapter)
+- [9. v2 Session State](#9-v2-session-state)
 - [E2E Tests](#e2e-tests)
   - [E2E Prerequisites](#e2e-prerequisites)
   - [E2E-1: Video/Audio WHEP (Receive)](#e2e-1-videoaudio-whep-receive)
@@ -34,6 +36,10 @@
 | WebSocket Signaling | Unit | `jvmTest` | ktor-client-mock | MockEngine |
 | State / Sealed classes | Unit | `commonTest` → `jvmTest` | kotlin-test | Pure Kotlin |
 | DataChannel config | Unit | `commonTest` → `jvmTest` | kotlin-test | Pure Kotlin |
+| v2 SignalingAdapter types | Unit | `jvmTest` | kotlin-test | Pure Kotlin |
+| v2 WhepSignalingAdapter | Unit | `jvmTest` | ktor-client-mock | MockEngine |
+| v2 WhipSignalingAdapter | Unit | `jvmTest` | ktor-client-mock | MockEngine |
+| v2 SessionState | Unit | `jvmTest` | kotlin-test | Pure Kotlin |
 | WebRTCClient basic | Integration | `jvmTest` | webrtc-java | Real native lib |
 | E2E full flow | E2E | `jvmTest` | webrtc-java + MediaMTX | Real server |
 
@@ -111,9 +117,14 @@ src/
     ├── config/
     │   └── StreamRetryHandlerTest.kt
     ├── signaling/
+    │   ├── SignalingAdapterTest.kt
+    │   ├── WhepSignalingAdapterTest.kt
+    │   ├── WhipSignalingAdapterTest.kt
     │   ├── WhepSignalingTest.kt
     │   ├── WhipSignalingTest.kt
     │   └── WebSocketSignalingTest.kt
+    ├── session/
+    │   └── SessionStateTest.kt
     └── e2e/
         ├── MockSignalingServer.kt         # Ktor embedded WHEP/WHIP server
         ├── ServerPeerConnection.kt        # Server-side WebRTCClient wrapper
@@ -140,7 +151,7 @@ src/
 | RC-03 | `calculateDelay(1)` | ≈2000ms (±10% jitter) |
 | RC-04 | `calculateDelay(2)` | ≈4000ms (±10% jitter) |
 | RC-05 | `calculateDelay(10)` large attempt | Capped at `maxDelayMs` (45000), never exceeds it |
-| RC-06 | `AGGRESSIVE` preset | `maxRetries=5, initialDelayMs=500, maxDelayMs=10000, backoffFactor=1.5` |
+| RC-06 | `AGGRESSIVE` preset | `maxRetries=10, initialDelayMs=500, maxDelayMs=60000, backoffFactor=1.5` |
 | RC-07 | `DISABLED` preset | `maxRetries=0` |
 | RC-08 | Delay always ≥ 0 | Even with max negative jitter range, result is `coerceAtLeast(0)` |
 | RC-09 | Data class equality | Two `RetryConfig` with same values are equal |
@@ -438,6 +449,81 @@ src/
 | EV-07 | `SignalingType.entries` | 2: `WHEP_HTTP, WEBSOCKET` |
 | EV-08 | `DataChannelState.entries` | 4: `CONNECTING, OPEN, CLOSING, CLOSED` |
 | EV-09 | `WhipErrorCode.entries` | 5: `NETWORK_ERROR, OFFER_REJECTED, ICE_CANDIDATE_FAILED, SESSION_TERMINATED, UNKNOWN` |
+
+---
+
+### 8. v2 Signaling Adapter
+
+> Tests for `SignalingResult`, `SignalingAuth`, `WhepSignalingAdapter`, and `WhipSignalingAdapter` — the v2 signaling layer.
+
+#### 8.1 SignalingResult & SignalingAuth
+
+| ID | Test | Expected |
+|----|------|----------|
+| SR-01 | `SignalingResult` defaults | `resourceUrl=null, etag=null, iceServers=empty` |
+| SR-02 | `SignalingResult` stores all fields | sdpAnswer, resourceUrl, etag, iceServers all populated |
+| SR-03 | `SignalingResult` data class equality | Two with same values are equal |
+| SA-01 | `SignalingAuth.None` is singleton | `is SignalingAuth.None` |
+| SA-02 | `SignalingAuth.Bearer` stores token | `token` accessible |
+| SA-03 | `SignalingAuth.Cookies` stores map | cookies map accessible |
+| SA-04 | `SignalingAuth.Custom` stores headers | headers map accessible |
+| SA-05 | Sealed interface exhaustive | All 4 basic variants covered |
+
+#### 8.2 WhepSignalingAdapter
+
+| ID | Test | Expected |
+|----|------|----------|
+| WSA-01 | `sendOffer()` → 201 | Returns `SignalingResult` with SDP answer |
+| WSA-02 | `sendOffer()` → 200 | Also accepted |
+| WSA-03 | `sendOffer()` → 4xx | Throws `WhepException` |
+| WSA-04 | Location header (absolute URL) | `resourceUrl` is exact header value |
+| WSA-05 | No Location header | `resourceUrl = null` |
+| WSA-06 | Bearer auth sends Authorization | Header = `Bearer <token>` |
+| WSA-07 | Cookies auth sends Cookie header | Formatted `name=value; ...` |
+| WSA-08 | Custom auth sends custom headers | All headers present |
+| WSA-09 | None auth sends no auth headers | No Authorization/Cookie headers |
+| WSA-10 | `sendIceCandidate()` sends SDP fragment | Content-Type `application/trickle-ice-sdpfrag` |
+| WSA-11 | SDP fragment includes ufrag/pwd | Body contains `a=ice-ufrag:`, `a=ice-pwd:` |
+| WSA-12 | `sendIceCandidate()` → non-2xx | Throws `WhepException` |
+| WSA-13 | `terminate()` sends DELETE | HTTP DELETE method |
+| WSA-14 | `terminate()` ignores errors | No exception on network failure |
+| WSA-15 | Resolve relative Location path | Correctly resolved to absolute URL |
+| WSA-16 | Resolve absolute Location URL | Returned as-is |
+| WSA-17 | Blank Location → null | `resourceUrl = null` |
+| WSA-18 | `buildSdpFragment` includes all fields | ufrag, pwd, mid, candidate present |
+| WSA-19 | `buildSdpFragment` omits null fields | Missing fields excluded |
+
+#### 8.3 WhipSignalingAdapter
+
+| ID | Test | Expected |
+|----|------|----------|
+| WIPA-01 | `sendOffer()` → 201 | Returns `SignalingResult` |
+| WIPA-02 | `sendOffer()` → 4xx | Throws `WhipException` with OFFER_REJECTED |
+| WIPA-03 | `sendOffer()` → network error | Throws `WhipException` with NETWORK_ERROR |
+| WIPA-04 | Bearer auth | Authorization header sent |
+| WIPA-05 | Custom auth | Custom headers sent |
+| WIPA-06 | `sendIceCandidate()` → 204 | Success |
+| WIPA-07 | `sendIceCandidate()` → failure | Throws `WhipException` |
+| WIPA-08 | `terminate()` sends DELETE | Ignores errors |
+| WIPA-09 | Auth headers on sendIceCandidate | Auth propagated |
+| WIPA-10 | Auth headers on terminate | Auth propagated |
+
+---
+
+### 9. v2 Session State
+
+| ID | Test | Expected |
+|----|------|----------|
+| SS-01 | `Idle` is singleton | Same reference |
+| SS-02 | `Connecting` is singleton | Same reference |
+| SS-03 | `Connected` is singleton | Same reference |
+| SS-04 | `Closed` is singleton | Same reference |
+| SS-05 | `Reconnecting` stores attempt/maxAttempts | `attempt=2, maxAttempts=5` accessible |
+| SS-06 | `Reconnecting` data class equality | Same values → equal |
+| SS-07 | `Error` defaults | `message` stored, `cause=null`, `isRetryable=true` |
+| SS-08 | `Error` with cause and retryable | All fields accessible |
+| SS-09 | `Error` data class equality | Ignores cause reference identity |
+| SS-10 | `when` covers all states | Exhaustive when expression compiles |
 
 ---
 
@@ -819,10 +905,14 @@ abstract class E2ETestBase {
 | Player State & UI models | 20 | commonTest | kotlin-test |
 | DataChannel config | 10 | commonTest | kotlin-test |
 | WebRTC data models | 21 | commonTest | kotlin-test |
-| **Unit Total** | **~157** | | |
+| v2 SignalingResult & Auth | 8 | jvmTest | kotlin-test |
+| v2 WhepSignalingAdapter | 19 | jvmTest | ktor-client-mock |
+| v2 WhipSignalingAdapter | 10 | jvmTest | ktor-client-mock |
+| v2 SessionState | 10 | jvmTest | kotlin-test |
+| **Unit Total** | **~167** | | |
 | E2E WHEP (receive) | 10 | jvmTest | MockSignalingServer + webrtc-java |
 | E2E WHIP (send) | 9 | jvmTest | MockSignalingServer + webrtc-java |
 | E2E DataChannel WHEP | 12 | jvmTest | MockSignalingServer + echo handler |
 | E2E DataChannel WHIP | 9 | jvmTest | MockSignalingServer + echo handler |
 | **E2E Total** | **~40** | | |
-| **Grand Total** | **~197** | | |
+| **Grand Total** | **~207** | | |

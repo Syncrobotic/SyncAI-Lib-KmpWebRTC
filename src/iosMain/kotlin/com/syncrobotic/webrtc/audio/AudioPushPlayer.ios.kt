@@ -1,7 +1,11 @@
+@file:Suppress("DEPRECATION")
+
 package com.syncrobotic.webrtc.audio
 
 import androidx.compose.runtime.*
 import com.syncrobotic.webrtc.*
+import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WhipSession
 import com.syncrobotic.webrtc.signaling.WhipSignaling
 import io.ktor.client.*
 import io.ktor.client.engine.darwin.*
@@ -12,9 +16,38 @@ import platform.AVFAudio.*
 import platform.Foundation.NSLog
 
 /**
- * iOS implementation of AudioPushPlayer.
- * Uses WebRTCClient for audio push via WHIP protocol.
+ * iOS implementation of session-based AudioPushPlayer.
  */
+@Composable
+actual fun AudioPushPlayer(
+    session: WhipSession,
+    autoStart: Boolean,
+    onStateChange: ((AudioPushState) -> Unit)?,
+): AudioPushController {
+    val scope = rememberCoroutineScope()
+    val sessionState by session.state.collectAsState()
+
+    LaunchedEffect(session, autoStart) {
+        if (autoStart && (session.state.value == SessionState.Idle || session.state.value is SessionState.Error)) {
+            session.connect()
+        }
+    }
+
+    LaunchedEffect(sessionState) {
+        onStateChange?.invoke(sessionState.toAudioPushState())
+    }
+
+    DisposableEffect(session) {
+        onDispose { /* Session lifecycle managed by user */ }
+    }
+
+    return remember(session) { SessionAudioPushController(session, scope) }
+}
+
+/**
+ * iOS implementation of AudioPushPlayer (legacy config-based API).
+ */
+@Suppress("DEPRECATION")
 @Composable
 actual fun AudioPushPlayer(
     config: AudioPushConfig,
@@ -49,6 +82,7 @@ actual fun AudioPushPlayer(
 /**
  * Remember an AudioPushController with automatic lifecycle management.
  */
+@Suppress("DEPRECATION")
 @Composable
 actual fun rememberAudioPushController(
     config: AudioPushConfig,
@@ -77,7 +111,16 @@ actual class AudioPushClient actual constructor(
     actual override fun stop() = impl.stop()
     actual override fun setMuted(muted: Boolean) = impl.setMuted(muted)
     actual override suspend fun refreshStats() = impl.refreshStats()
+    @Deprecated(
+        message = "Use close() instead for consistent naming with Session API. Will be removed in v3.0.",
+        replaceWith = ReplaceWith("close()")
+    )
     actual fun release() = impl.release()
+
+    actual fun close() {
+        @Suppress("DEPRECATION")
+        release()
+    }
 }
 
 /**
