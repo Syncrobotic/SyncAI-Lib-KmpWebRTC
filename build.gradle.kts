@@ -93,6 +93,20 @@ kotlin {
         
         commonTest.dependencies {
             implementation(webrtcLibs.kotlin.test)
+            implementation(webrtcLibs.kotlinx.coroutines.test)
+        }
+        
+        val jvmTest by getting {
+            dependencies {
+                implementation(webrtcLibs.kotlin.testJunit)
+                implementation(webrtcLibs.ktor.client.mock)
+                implementation(webrtcLibs.ktor.client.cio)
+                
+                // E2E: in-process mock WHEP/WHIP server
+                implementation(webrtcLibs.ktor.server.core)
+                implementation(webrtcLibs.ktor.server.netty)
+                implementation(webrtcLibs.ktor.server.content.negotiation)
+            }
         }
         
         jvmMain.dependencies {
