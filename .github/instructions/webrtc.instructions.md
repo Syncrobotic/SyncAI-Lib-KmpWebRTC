@@ -5,11 +5,19 @@ description: "Use when working on WebRTC connection logic, signaling (WHEP/WHIP/
 
 ## PeerConnection Lifecycle
 
-1. Create a `WebRTCClient` instance
-2. Exchange SDP offer/answer via Signaling (WHEP/WHIP/WebSocket)
-3. Handle ICE candidates (supports trickle ICE)
-4. After connection is established, receive/send media streams
-5. Call `close()` to release all resources when done
+v2 API (preferred):
+1. Create a `SignalingAdapter` (e.g. `WhepSignalingAdapter(url, auth)`)
+2. Create a `WhepSession(signaling)` or `WhipSession(signaling)`
+3. Call `session.connect()` — SDP exchange, ICE, and media are handled internally
+4. Observe state via `session.state: StateFlow`
+5. Call `session.close()` to release all resources
+
+Internal (managed by Session, not directly used):
+1. `WebRTCClient` creates PeerConnection
+2. SDP offer/answer exchanged via SignalingAdapter
+3. ICE candidates trickled via SignalingAdapter
+4. Media streams received/sent
+5. Resources released on `close()`
 
 ## PeerConnectionFactory Strategy
 
@@ -19,10 +27,19 @@ description: "Use when working on WebRTC connection logic, signaling (WHEP/WHIP/
 
 ## Signaling
 
-- `WhepSignaling`: HTTP POST for SDP exchange, PATCH for ICE candidates; used for receiving streams
-- `WhipSignaling`: HTTP POST for SDP exchange; used for sending streams (audio push)
-- `WebSocketSignaling`: WebSocket connection with heartbeat mechanism; used for custom backends
-- All signaling classes are in `src/commonMain/kotlin/com/syncrobotic/webrtc/signaling/`
+### v2 (current)
+- `SignalingAdapter`: Interface with `sendOffer()`, `sendIceCandidate()`, `terminate()`
+- `WhepSignalingAdapter`: HTTP WHEP signaling for receiving streams (POST offer, PATCH ICE, DELETE teardown)
+- `WhipSignalingAdapter`: HTTP WHIP signaling for sending streams
+- `SignalingAuth`: Pluggable auth — `Bearer(token)`, `Cookies(map)`, `CookieStorage(storage)`, `Custom(headers)`, `None`
+- `SignalingResult`: Unified response type with `sdpAnswer`, `resourceUrl`, `etag`, `iceServers`
+
+### Legacy (deprecated, will be removed in v3.0)
+- `WhepSignaling`: Direct HTTP client, no auth abstraction
+- `WhipSignaling`: Direct HTTP client, no auth abstraction
+- `WebSocketSignaling`: WebSocket with heartbeat mechanism
+
+All signaling code is in `src/commonMain/kotlin/com/syncrobotic/webrtc/signaling/`
 
 ## Auto-Reconnect
 
@@ -39,6 +56,6 @@ description: "Use when working on WebRTC connection logic, signaling (WHEP/WHIP/
 ## Error Handling
 
 - Connection/streaming errors expressed as sealed class states (`PlayerState.Error(message, cause, isRetryable)`)
-- Signaling layer uses custom Exceptions: `WhepException`, `WhipException`, `WebSocketSignalingException`
+- Signaling layer uses custom Exceptions: `WhepException`, `WhipException` (with `WhipErrorCode` enum: `OFFER_REJECTED`, `ICE_CANDIDATE_FAILED`, `NETWORK_ERROR`, etc.), `WebSocketSignalingException`
 - Throws `StreamRetryExhaustedException` when retries are exhausted
 - When adding error handling, prefer using state machine Error states over direct throw
