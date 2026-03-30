@@ -1,7 +1,8 @@
 # SyncAI-Lib-KmpWebRTC SDK Roadmap
 
 > 📅 Created: 2026-03-26  
-> 📌 Status: Planning
+> � Last Updated: 2026-03-30  
+> 📌 Status: v2.0 API Complete — Phase 1-5 Done
 
 ---
 
@@ -24,200 +25,126 @@
 
 | Feature | SyncAI-Lib-KmpWebRTC | WebRTC Native SDK | Other KMP Solutions |
 |---------|--------------------|--------------------|---------------------|
-| Cross-platform | ✅ Android/iOS/JVM (Web in progress) | ❌ Separate per platform | Partial support |
-| Learning curve | Low (Composable API) | High | Medium |
+| Cross-platform | ✅ Android/iOS/JVM/JS/WasmJS | ❌ Separate per platform | Partial support |
+| Learning curve | Low (Session + Composable API) | High | Medium |
 | Low-latency optimization | ⏳ Preset planned | Manual configuration | Not guaranteed |
-| Built-in signaling | ✅ WHEP/WHIP/WebSocket | ❌ Must implement yourself | Partial |
-| IoT scenario optimization | ✅ Multi-video sources, DataChannel | ❌ General-purpose design | ❌ |
+| Built-in signaling | ✅ WHEP/WHIP + pluggable `SignalingAdapter` | ❌ Must implement yourself | Partial |
+| IoT scenario optimization | ✅ Multi-video sources, DataChannel, custom auth | ❌ General-purpose design | ❌ |
 
 ---
 
 ## 2. Feature Planning
 
-### 2.1 Current Features (v1.x)
+### 2.1 Current Features (v2.0)
+
+#### Core API (v2 — Session-based)
 
 | Feature | Platform Support | Status |
 |---------|-----------------|--------|
-| Video Receive (WHEP) | Android/iOS/JVM | ✅ Verified |
-| Audio Send (WHIP) | Android/iOS/JVM | ✅ Verified |
-| Audio Receive | Android/iOS/JVM | ✅ Verified |
-| DataChannel (Text) | Android/iOS/JVM | ✅ Implemented |
-| DataChannel (Binary) | Android/iOS/JVM | ✅ Implemented |
-| VideoRenderer Composable | Android/iOS/JVM | ✅ Available |
-| Multiple VideoRenderer instances | Android/iOS/JVM | ✅ Supported (each instance has independent PeerConnection, no shared state conflicts) |
-| AudioPushPlayer Composable | Android/iOS/JVM/JS | ✅ Available |
-| BidirectionalPlayer | Android/iOS/JVM | ✅ Available |
-| Web (JS) | Browser | ⚠️ Stub (VideoRenderer not implemented, only WebRTCClient + AudioPush basically usable) |
-| Web (WasmJS) | Browser | ❌ Incomplete (missing VideoRenderer, AudioPushPlayer) |
-| Auto-reconnect | All | ✅ Available |
-| Connection Stats | All | ✅ Implemented (requires manual getStats() call, not StateFlow) |
+| **WhepSession** (video/audio receive) | Android/iOS/JVM/JS/WasmJS | ✅ Implemented |
+| **WhipSession** (audio send) | Android/iOS/JVM/JS/WasmJS | ✅ Implemented |
+| **SignalingAdapter** interface | All | ✅ Implemented |
+| **WhepSignalingAdapter** (built-in WHEP) | All | ✅ Implemented |
+| **WhipSignalingAdapter** (built-in WHIP) | All | ✅ Implemented |
+| **SignalingAuth** (Bearer, Cookies, CookieStorage, Custom) | All | ✅ Implemented |
+| **SessionState** (reactive `StateFlow`) | All | ✅ Implemented |
+| **Real-time Stats** (`session.stats: StateFlow<WebRTCStats?>`) | All | ✅ Implemented |
+| **RetryConfig** (DEFAULT / AGGRESSIVE / DISABLED) | All | ✅ Implemented |
+| **VideoRenderer** (session-based Composable) | Android/iOS/JVM | ✅ Implemented |
+| **AudioPushPlayer** (session-based Composable) | Android/iOS/JVM/JS/WasmJS | ✅ Implemented |
+| **DataChannel** (text + binary) | Android/iOS/JVM/JS/WasmJS | ✅ Implemented |
+| DataChannel presets (reliable/unreliable/maxLifetime) | All | ✅ Implemented |
+| Auto-reconnect with exponential backoff | All | ✅ Implemented |
+| Multiple simultaneous sessions | All | ✅ Supported |
+| **PlayerEvent** (FirstFrameRendered, StreamInfoReceived) | Android/iOS/JVM | ✅ Implemented |
 
-### 2.2 Phase 1: IoT Core Features
+#### Legacy API (v1 — Deprecated, will be removed in v3.0)
 
-**Estimated timeline**: 2-3 weeks
+| Feature | Status |
+|---------|--------|
+| `WebRTCClient` (direct use) | `@Deprecated` → use WhepSession/WhipSession |
+| `BidirectionalPlayer` | `@Deprecated` → use VideoRenderer + AudioPushPlayer |
+| `VideoRenderer(config: StreamConfig)` | `@Deprecated` → use VideoRenderer(session) |
+| `AudioPushPlayer(config: AudioPushConfig)` | `@Deprecated` → use AudioPushPlayer(session) |
+| `WhepSignaling` / `WhipSignaling` | `@Deprecated` → use WhepSignalingAdapter/WhipSignalingAdapter |
+| `WebSocketSignaling` | `@Deprecated` → implement custom SignalingAdapter |
+| `StreamConfig`, `ServerEndpoints`, `StreamProtocol`, `StreamDirection`, `SignalingType` | `@Deprecated` |
+| `AudioRetryConfig` | `@Deprecated` → use RetryConfig |
+| `BidirectionalConfig` | `@Deprecated` |
+| `AudioPushClient.release()` | `@Deprecated` → use close() |
+| `WebRTCListener.onError(String)` | `@Deprecated` → use onError(Throwable) |
 
-| Feature | Description | Platform | Priority |
-|---------|-------------|----------|----------|
-| **VideoPushPlayer** | Push video from phone camera (WHIP) | Android/iOS | 🔴 P0 |
-| **MultiStreamManager** | Convenience API for managing multiple video sources (Note: multiple VideoRenderers can already be manually composed) | All | 🟡 P1 |
-| **Low-latency Preset** | Default config: UDP only, disable jitter buffer | All | 🔴 P0 |
-| **Real-time Network Quality Monitoring** | RTT/Packet loss/Bitrate StateFlow | All | 🔴 P0 |
-| **CameraCapturer** | Cross-platform camera capture abstraction | Android/iOS | 🔴 P0 |
+#### Platform Status
 
-#### 2.2.1 VideoPushPlayer API Design
+| Platform | Video Receive | Audio Send | DataChannel | Composable UI |
+|----------|--------------|------------|-------------|---------------|
+| Android | ✅ | ✅ | ✅ | ✅ |
+| iOS (Physical Device) | ✅ | ✅ | ✅ | ✅ |
+| iOS Simulator | ❌ GoogleWebRTC limitation | | | |
+| JVM/Desktop | ✅ | ✅ | ✅ | ✅ |
+| JS (Browser) | ⚠️ Stub | ⚠️ Stub | ✅ | ⚠️ Placeholder |
+| WasmJS (Browser) | ⚠️ Stub | ⚠️ Stub | ✅ | ⚠️ Placeholder |
+
+### 2.2 Next: IoT Enhancements
+
+| Feature | Description | Platform | Priority | Status |
+|---------|-------------|----------|----------|--------|
+| **VideoPushPlayer** | Push video from phone camera (WHIP) | Android/iOS | 🔴 P0 | ❌ Not started |
+| **CameraCapturer** | Cross-platform camera capture abstraction | Android/iOS | 🔴 P0 | ❌ Not started |
+| **Low-latency Preset** | `WebRTCConfig.LOW_LATENCY` with tuned jitter buffer, FEC, codec | All | 🟡 P1 | ❌ Not started |
+| **MultiStreamManager** | Convenience API for managing multiple sessions | All | 🟢 P2 | ❌ Not started |
+
+#### VideoPushPlayer API Design
 
 ```kotlin
 @Composable
 fun VideoPushPlayer(
-    config: VideoPushConfig,
+    session: WhipSession,   // v2 pattern: session-based
     modifier: Modifier = Modifier,
     autoStart: Boolean = false,
-    onStateChange: (VideoPushState) -> Unit = {}
+    onStateChange: (PlayerState) -> Unit = {}
 ): VideoPushController
 
 data class VideoPushConfig(
-    val whipUrl: String,
     val resolution: Resolution = Resolution.HD_720,
     val fps: Int = 30,
-    val bitrate: Int = 2_000_000,  // 2 Mbps
-    val cameraFacing: CameraFacing = CameraFacing.BACK,
-    val lowLatencyMode: Boolean = true,
-    val webrtcConfig: WebRTCConfig = WebRTCConfig.SENDER
-)
-
-sealed class VideoPushState {
-    object Idle : VideoPushState()
-    object Connecting : VideoPushState()
-    object Streaming : VideoPushState()
-    data class Error(val message: String, val isRecoverable: Boolean) : VideoPushState()
-    data class Reconnecting(val attempt: Int, val maxAttempts: Int) : VideoPushState()
-}
-```
-
-#### 2.2.2 MultiStreamManager API Design
-
-```kotlin
-class MultiStreamManager {
-    val streams: StateFlow<Map<String, StreamState>>
-    
-    fun addStream(id: String, config: StreamConfig)
-    fun removeStream(id: String)
-    fun reconnect(id: String)
-    fun reconnectAll()
-    
-    // Get controller for a specific stream
-    fun getController(id: String): VideoPlayerController?
-    
-    // Aggregated statistics
-    val aggregatedStats: StateFlow<AggregatedStats>
-}
-
-// Compose integration
-@Composable
-fun MultiVideoGrid(
-    manager: MultiStreamManager,
-    layout: GridLayout = GridLayout.AUTO,
-    modifier: Modifier = Modifier
+    val bitrate: Int = 2_000_000,
+    val cameraFacing: CameraFacing = CameraFacing.BACK
 )
 ```
 
-#### 2.2.3 Low-latency Configuration
+#### Low-latency Configuration
 
 ```kotlin
-object WebRTCConfig {
-    // Existing
-    val DEFAULT: WebRTCConfig
-    val SENDER: WebRTCConfig
-    
-    // New
-    val LOW_LATENCY: WebRTCConfig = WebRTCConfig(
-        iceTransportPolicy = IceTransportPolicy.ALL,
-        bundlePolicy = BundlePolicy.MAX_BUNDLE,
-        // Low-latency specific settings
-        jitterBufferMinMs = 0,
-        jitterBufferMaxMs = 100,
-        preferredVideoCodec = VideoCodec.H264_BASELINE,
-        enableFec = false,        // Disable FEC to reduce latency
-        enableNack = true,        // Keep NACK for packet loss handling
-        enableDtx = true          // DTX to save bandwidth
-    )
-}
-```
-
-### 2.3 Phase 2: Developer Experience
-
-**Estimated timeline**: 1-2 weeks
-
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| **Signaling Abstract Interface** | Allow users to implement custom signaling | 🔴 P0 |
-| **Structured Error System** | Error codes + recoverability flags | 🟡 P1 |
-| **Pluggable Logger** | User-injectable custom logger | 🟡 P1 |
-| **Enhanced Auto-reconnect Strategy** | Configurable backoff policies | 🟡 P1 |
-| **Codec Preference Settings** | Priority: H264 > VP8 > VP9 | 🟢 P2 |
-
-#### 2.3.1 Signaling Abstract Interface
-
-```kotlin
-// Users can implement their own signaling
-interface SignalingClient {
-    suspend fun sendOffer(offer: String): SignalingResult
-    suspend fun sendAnswer(answer: String)
-    suspend fun sendIceCandidate(candidate: IceCandidate)
-    
-    val remoteIceCandidates: Flow<IceCandidate>
-    val connectionState: StateFlow<SignalingState>
-    
-    fun close()
-}
-
-data class SignalingResult(
-    val sdpAnswer: String,
-    val resourceUrl: String? = null,
-    val iceServers: List<IceServer> = emptyList()
-)
-
-// Usage
-val customSignaling = MyFirebaseSignaling(roomId = "room-123")
-
-VideoRenderer(
-    signaling = customSignaling,
-    modifier = Modifier.fillMaxSize()
+val LOW_LATENCY: WebRTCConfig = WebRTCConfig(
+    iceTransportPolicy = "all",
+    bundlePolicy = "max-bundle",
+    // Low-latency specific settings
+    jitterBufferMinMs = 0,
+    jitterBufferMaxMs = 100,
+    preferredVideoCodec = "H264",
+    enableFec = false,
+    enableNack = true,
+    enableDtx = true
 )
 ```
 
-#### 2.3.2 Structured Error System
+### 2.3 Next: Developer Experience
 
-```kotlin
-sealed class WebRTCError(
-    val code: String,
-    val message: String,
-    val isRecoverable: Boolean,
-    val cause: Throwable? = null
-) {
-    // Connection errors (WC = WebRTC Connection)
-    class ConnectionTimeout : WebRTCError("WC001", "Connection timeout", true)
-    class IceNegotiationFailed : WebRTCError("WC002", "ICE negotiation failed", true)
-    class DtlsHandshakeFailed : WebRTCError("WC003", "DTLS handshake failed", true)
-    class ConnectionLost : WebRTCError("WC004", "Connection lost", true)
-    
-    // Signaling errors (WS = WebRTC Signaling)
-    class SignalingTimeout : WebRTCError("WS001", "Signaling timeout", true)
-    class InvalidSdp(details: String) : WebRTCError("WS002", "Invalid SDP: $details", false)
-    class SignalingServerError(status: Int) : WebRTCError("WS003", "Server error: $status", true)
-    
-    // DataChannel errors (WD = WebRTC DataChannel)
-    class DataChannelNotOpen : WebRTCError("WD001", "DataChannel not open", false)
-    class MessageTooLarge(size: Int) : WebRTCError("WD002", "Message too large: $size bytes", false)
-    
-    // Media errors (WM = WebRTC Media)
-    class CameraAccessDenied : WebRTCError("WM001", "Camera access denied", false)
-    class MicrophoneAccessDenied : WebRTCError("WM002", "Microphone access denied", false)
-    class CodecNotSupported(codec: String) : WebRTCError("WM003", "Unsupported codec: $codec", false)
-}
-```
+| Feature | Description | Priority | Status |
+|---------|-------------|----------|--------|
+| **Pluggable Logger** | `WebRTCLogger` interface, injectable globally | 🟡 P1 | ❌ Not started |
+| **Structured Error Codes** | `WebRTCError` sealed class with error codes | 🟢 P2 | ❌ Not started |
+| **Codec Preference Settings** | SDP munging for codec priority | 🟢 P2 | ❌ Not started |
+| **WebSocketSignalingAdapter** | Built-in WebSocket signaling (replace deprecated `WebSocketSignaling`) | 🟡 P1 | ❌ Not started |
 
-#### 2.3.3 Pluggable Logger
+> **Already completed in v2.0:**
+> - ✅ Signaling Abstract Interface → `SignalingAdapter`
+> - ✅ Enhanced Auto-reconnect → `RetryConfig` (DEFAULT/AGGRESSIVE/DISABLED)
+> - ✅ Error recoverability flags → `SessionState.Error(isRetryable)`
+> - ✅ Type-safe authentication → `SignalingAuth` (Bearer, Cookies, CookieStorage, Custom)
+
+#### Pluggable Logger (Planned)
 
 ```kotlin
 interface WebRTCLogger {
@@ -228,33 +155,23 @@ interface WebRTCLogger {
     fun error(tag: String, message: String, error: Throwable)
 }
 
-// Global configuration
-WebRTCClient.setLogger(object : WebRTCLogger {
-    override fun debug(tag: String, message: String) {
-        Timber.tag(tag).d(message)  // Integrate with Timber
-    }
-    // ...
-})
-
-// Or use built-in logger level
-WebRTCClient.setLogLevel(LogLevel.DEBUG)
+// Usage
+WebRTCLoggerFactory.setLogger(myTimberLogger)
+WebRTCLoggerFactory.setLogLevel(LogLevel.DEBUG)
 ```
 
-### 2.4 Phase 3: Quality & Open Source Readiness
+### 2.4 Next: Quality & Open Source Readiness
 
-**Estimated timeline**: 2 weeks
+| Item | Description | Priority | Status |
+|------|-------------|----------|--------|
+| **Unit Tests** | Core logic tests (Signaling, Config, State) | 🔴 P0 | ✅ **207 tests passing** |
+| **E2E Tests** | In-process mock server round-trip tests | 🟡 P1 | ⚠️ Spec designed, not implemented |
+| **API Documentation** | Dokka generation + GitHub Pages | 🔴 P0 | ❌ Not started |
+| **Sample Projects** | samples/robot-control | 🔴 P0 | ❌ Not started |
+| **Community Templates** | Issue/PR templates | 🟡 P1 | ❌ Not started |
+| **CONTRIBUTING.md** | Contribution guide | 🟡 P1 | ❌ Not started |
 
-| Item | Description | Priority |
-|------|-------------|----------|
-| **Unit Tests** | Core logic tests (Signaling, Config, State) | 🔴 P0 |
-| **Integration Tests** | End-to-end connection tests | 🟡 P1 |
-| **API Documentation** | Dokka generation + GitHub Pages | 🔴 P0 |
-| **Sample Projects** | samples/robot-control | 🔴 P0 |
-| **Community Templates** | Issue/PR templates | 🟡 P1 |
-| **CONTRIBUTING.md** | Contribution guide | 🟡 P1 |
-| **ARCHITECTURE.md** | Architecture design document | 🟢 P2 |
-
-### 2.5 Phase 4: Advanced Features (Future)
+### 2.5 Future: Advanced Features
 
 | Feature | Description | Use Case |
 |---------|-------------|----------|
@@ -262,7 +179,7 @@ WebRTCClient.setLogLevel(LogLevel.DEBUG)
 | **Local Recording** | Record streams to file | Archive/playback |
 | **Simulcast** | Send multiple resolutions simultaneously | Multi-party conference (SFU) |
 | **E2E Encryption** | Insertable Streams | Privacy-sensitive applications |
-| **AR/VR Support** | 360 video, spatial audio | XR applications |
+| **JS/WasmJS Full Support** | Complete VideoRenderer + AudioPush for browsers | Web applications |
 
 ---
 
@@ -296,78 +213,92 @@ WebRTCClient.setLogLevel(LogLevel.DEBUG)
 
 ---
 
-## 4. Project Structure Planning
+## 4. Project Structure
 
-### 4.1 Current Structure
+### 4.1 Current Structure (Single-module KMP)
 
 ```
 SyncAI-Lib-KmpWebRTC/
 ├── src/
-│   ├── commonMain/      # Shared code
-│   ├── androidMain/     # Android implementation
-│   ├── iosMain/         # iOS implementation
-│   ├── jvmMain/         # JVM implementation
-│   ├── jsMain/          # JS implementation
-│   └── wasmJsMain/      # WasmJS implementation
+│   ├── commonMain/kotlin/com/syncrobotic/webrtc/
+│   │   ├── config/          # WebRTCConfig, RetryConfig, IceServer
+│   │   ├── signaling/       # SignalingAdapter, SignalingAuth, WHEP/WHIP adapters
+│   │   ├── session/         # WhepSession, WhipSession, SessionState
+│   │   ├── audio/           # AudioPushConfig, AudioPushController, AudioPushClient
+│   │   ├── ui/              # VideoRenderer, PlayerState, PlayerEvent
+│   │   └── datachannel/     # DataChannel, DataChannelConfig, DataChannelListener
+│   ├── androidMain/         # Android actual implementations
+│   ├── iosMain/             # iOS actual implementations
+│   ├── jvmMain/             # JVM actual implementations
+│   ├── jsMain/              # JS stub implementations
+│   └── wasmJsMain/          # WasmJS stub implementations
+├── docs/
+│   ├── ROADMAP.md           # This document
+│   ├── README_V2.md         # v2 API spec (source of truth for README.md)
+│   └── TEST_SPEC.md         # Test specification
+├── .github/
+│   ├── copilot-instructions.md
+│   ├── instructions/        # KMP and WebRTC instruction files
+│   └── workflows/           # CI/CD
 └── build.gradle.kts
 ```
 
-### 4.2 Planned Structure (Modularized)
+### 4.2 Future: Modularized Structure (Considered for v3.0)
 
 ```
 SyncAI-Lib-KmpWebRTC/
 ├── core/                       # Core API + abstractions
-│   └── src/commonMain/
-│       ├── WebRTCClient.kt
-│       ├── signaling/SignalingClient.kt  (interface)
-│       └── error/WebRTCError.kt
-├── signaling-whep/             # WHEP implementation (optional)
-├── signaling-whip/             # WHIP implementation (optional)
-├── signaling-websocket/        # WebSocket implementation (optional)
+├── signaling-whep/             # WHEP adapter (optional)
+├── signaling-whip/             # WHIP adapter (optional)
+├── signaling-websocket/        # WebSocket adapter (optional)
 ├── compose-ui/                 # Compose UI components (optional)
-│   └── src/commonMain/
-│       ├── VideoRenderer.kt
-│       ├── AudioPushPlayer.kt
-│       ├── VideoPushPlayer.kt
-│       └── MultiVideoGrid.kt
 ├── samples/                    # Sample projects
-│   ├── minimal-android/
-│   ├── minimal-ios/
-│   ├── minimal-desktop/
-│   └── robot-control/          # Complete example
-├── docs/
-│   ├── ROADMAP.md              # This document
-│   ├── ARCHITECTURE.md
-│   ├── CONTRIBUTING.md
-│   └── api/                    # Dokka generated
-└── .github/
-    ├── ISSUE_TEMPLATE/
-    ├── PULL_REQUEST_TEMPLATE.md
-    └── workflows/
+└── docs/
 ```
+
+> **Decision**: Modularization deferred to v3.0. Current single-module approach is simpler and sufficient for the current API surface.
 
 ---
 
-## 5. Milestones
+## 5. Version History & Milestones
 
-| Version | Estimated Time | Key Content |
-|---------|---------------|-------------|
-| **v1.5.0** | +3 weeks | VideoPushPlayer, MultiStreamManager, Low-latency preset |
-| **v1.6.0** | +5 weeks | Signaling abstract interface, Structured errors, Logger |
-| **v2.0.0** | +7 weeks | Modularization, Stable API, Full documentation, Sample projects |
-| **v2.1.0** | Future | Screen sharing |
-| **v2.2.0** | Future | Local recording |
+### Completed
+
+| Version | Date | Key Content |
+|---------|------|-------------|
+| **v1.x** | 2026-03 | Video receive (WHEP), audio send (WHIP), DataChannel, auto-reconnect, 5 platform support |
+| **v2.0** (in progress) | 2026-03-30 | Session API, SignalingAdapter, SignalingAuth, deprecated v1 types, 207 unit tests |
+
+### v2.0 Migration Phases (All Complete)
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 1 | `SignalingAdapter` interface + `WhepSignalingAdapter`/`WhipSignalingAdapter` | ✅ Done |
+| Phase 2 | Deprecate legacy config types (`StreamProtocol`, `StreamDirection`, etc.) | ✅ Done |
+| Phase 3 | `WhepSession` / `WhipSession` expect/actual across 5 platforms | ✅ Done |
+| Phase 4 | Session-based `VideoRenderer` + `AudioPushPlayer` composables | ✅ Done |
+| Phase 5 | Consistency cleanup (`onError(Throwable)`, `AudioPushClient.close()`) | ✅ Done |
+
+### Planned
+
+| Version | Key Content |
+|---------|-------------|
+| **v2.1** | WebSocketSignalingAdapter, Pluggable Logger |
+| **v2.2** | VideoPushPlayer, CameraCapturer, Low-latency preset |
+| **v2.3** | Sample projects, Dokka documentation, E2E tests |
+| **v3.0** | Remove all deprecated v1 APIs, optional modularization |
 
 ---
 
 ## 6. Open Questions
 
-- [ ] When to modularize? (v2.0 or earlier)
+- [x] Multiple VideoRenderer instances? → **Supported**, each session has independent PeerConnection
+- [x] Signaling abstraction approach? → **`SignalingAdapter` interface** (implemented in v2.0)
+- [x] When to deprecate v1 API? → **v2.0** (deprecated), **v3.0** (removed)
+- [ ] When to modularize? → Deferred to v3.0
 - [ ] Is Simulcast support needed?
-- [ ] Priority for Web platforms (JS/WasmJS)? (JS is currently Stub, WasmJS incomplete)
+- [ ] Priority for JS/WasmJS full implementation?
 - [ ] Should a backend signaling server reference implementation be provided?
-- [ ] Keep MIT license?
-- [x] Multiple VideoRenderer instances? → **Already supported**, each instance has independent PeerConnection with no shared state conflicts
 
 ---
 
