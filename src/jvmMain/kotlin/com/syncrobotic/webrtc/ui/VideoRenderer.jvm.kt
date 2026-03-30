@@ -22,6 +22,7 @@ import com.syncrobotic.webrtc.session.SessionState
 import com.syncrobotic.webrtc.session.WhepSession
 import dev.onvoid.webrtc.media.video.VideoFrame as NativeVideoFrame
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ImageInfo
@@ -48,12 +49,25 @@ actual fun VideoRenderer(
     var lastReportedWidth by remember { mutableStateOf(0) }
     var lastReportedHeight by remember { mutableStateOf(0) }
 
+    // SharedFlow to bridge WebRTC native thread → Compose main thread
+    val frameFlow = remember { MutableSharedFlow<ImageBitmap>(replay = 1) }
+
+    // Collect frames on the main thread to update Compose state
+    LaunchedEffect(frameFlow) {
+        frameFlow.collect { bitmap ->
+            currentFrame = bitmap
+        }
+    }
+
     // Set up video sink and auto-connect
     LaunchedEffect(session) {
         session.onClientReady = { client ->
             client.setVideoSink(object : dev.onvoid.webrtc.media.video.VideoTrackSink {
                 override fun onVideoFrame(frame: NativeVideoFrame) {
-                    currentFrame = convertVideoFrameToImageBitmap(frame)
+                    val bitmap = convertVideoFrameToImageBitmap(frame)
+                    if (bitmap != null) {
+                        frameFlow.tryEmit(bitmap)
+                    }
                     // Fire FirstFrameRendered once
                     if (!hasReportedFirstFrame) {
                         hasReportedFirstFrame = true
@@ -89,20 +103,24 @@ actual fun VideoRenderer(
         onStateChange?.invoke(sessionState.toPlayerState())
     }
 
-    // Render video or placeholder
+    // Render video (or placeholder) with status overlay
     val frame = currentFrame
-    if (frame != null) {
-        Canvas(modifier = modifier.fillMaxSize()) {
-            drawImage(
-                image = frame,
-                srcOffset = IntOffset.Zero,
-                srcSize = IntSize(frame.width, frame.height),
-                dstOffset = IntOffset.Zero,
-                dstSize = IntSize(size.width.toInt(), size.height.toInt())
-            )
+    Box(modifier = modifier.fillMaxSize()) {
+        if (frame != null) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawImage(
+                    image = frame,
+                    srcOffset = IntOffset.Zero,
+                    srcSize = IntSize(frame.width, frame.height),
+                    dstOffset = IntOffset.Zero,
+                    dstSize = IntSize(size.width.toInt(), size.height.toInt())
+                )
+            }
+            // Show overlay on top of last frame when not connected
+            SessionStatusOverlay(sessionState)
+        } else {
+            SessionVideoPlaceholder(sessionState, Modifier)
         }
-    } else {
-        SessionVideoPlaceholder(sessionState, modifier)
     }
 
     // Cleanup
@@ -212,7 +230,7 @@ private fun convertVideoFrameToImageBitmap(frame: NativeVideoFrame): ImageBitmap
         val height = i420.height
 
         val rgbaSize = width * height * 4
-        val rgbaBuffer = ByteBuffer.allocateDirect(rgbaSize)
+        val rgbaBytes = ByteArray(rgbaSize)
 
         // YUV to RGBA conversion
         val yPlane = i420.dataY
@@ -222,6 +240,7 @@ private fun convertVideoFrameToImageBitmap(frame: NativeVideoFrame): ImageBitmap
         val uStride = i420.strideU
         val vStride = i420.strideV
 
+        var offset = 0
         for (row in 0 until height) {
             for (col in 0 until width) {
                 val yIndex = row * yStride + col
@@ -236,22 +255,23 @@ private fun convertVideoFrameToImageBitmap(frame: NativeVideoFrame): ImageBitmap
                 val g = (y - 0.344136 * u - 0.714136 * v).toInt().coerceIn(0, 255)
                 val b = (y + 1.772 * u).toInt().coerceIn(0, 255)
 
-                rgbaBuffer.put(r.toByte())
-                rgbaBuffer.put(g.toByte())
-                rgbaBuffer.put(b.toByte())
-                rgbaBuffer.put(0xFF.toByte())
+                // Skia N32 = BGRA on most platforms
+                rgbaBytes[offset++] = b.toByte()
+                rgbaBytes[offset++] = g.toByte()
+                rgbaBytes[offset++] = r.toByte()
+                rgbaBytes[offset++] = 0xFF.toByte()
             }
         }
-        rgbaBuffer.rewind()
 
         val bitmap = Bitmap()
         bitmap.allocPixels(ImageInfo.makeN32(width, height, ColorAlphaType.OPAQUE))
-        bitmap.installPixels(bitmap.imageInfo, rgbaBuffer.array(), width * 4)
+        bitmap.installPixels(bitmap.imageInfo, rgbaBytes, width * 4)
 
         i420.release()
 
         bitmap.asComposeImageBitmap()
     } catch (e: Exception) {
+        println("[VideoRenderer] convertVideoFrameToImageBitmap error: ${e::class.simpleName}: ${e.message}")
         null
     }
 }

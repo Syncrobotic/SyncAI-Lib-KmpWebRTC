@@ -61,6 +61,10 @@ actual class DataChannel(
 
     actual fun setListener(listener: DataChannelListener?) {
         this.listener = listener
+        // Replay current state so caller doesn't miss events fired before listener was set
+        if (listener != null && state != DataChannelState.CONNECTING) {
+            listener.onStateChanged(state)
+        }
     }
 
     actual fun send(message: String): Boolean {
