@@ -18,6 +18,7 @@ Kotlin Multiplatform WebRTC SDK for IoT/robotics control scenarios — low-laten
   - [DataChannel Communication](#3-datachannel-communication)
   - [Authentication (JWT, Cookie, API Key)](#4-authentication)
   - [Custom Signaling Adapter](#5-custom-signaling-adapter)
+- [Customization & Limitations](#customization--limitations)
 - [API Reference](#api-reference)
   - [SignalingAdapter](#signalingadapter)
   - [WhepSession](#whepsession)
@@ -616,6 +617,40 @@ val signaling = FirebaseSignalingAdapter(roomId = "room-123", firestore)
 val session = WhepSession(signaling)
 session.connect()
 ```
+
+---
+
+## Customization & Limitations
+
+### What You Can Customize
+
+| Setting | How | Example |
+|---------|-----|---------|
+| **Signaling endpoint** (IP, port, path) | Full URL in adapter constructor | `WhipSignalingAdapter(url = "https://192.168.1.100:9090/custom/path/whip")` |
+| **STUN/TURN servers** | `WebRTCConfig.iceServers` | `IceServer(urls = listOf("turn:10.0.0.5:3478"), username, credential)` |
+| **ICE mode** | `WebRTCConfig.iceMode` | `IceMode.FULL_ICE` or `IceMode.TRICKLE_ICE` |
+| **ICE gathering timeout** | `WebRTCConfig.iceGatheringTimeoutMs` | `10_000L` (default 10s) |
+| **ICE transport policy** | `WebRTCConfig.iceTransportPolicy` | `"all"` or `"relay"` (force TURN) |
+| **Bundle / RTCP mux policy** | `WebRTCConfig.bundlePolicy`, `rtcpMuxPolicy` | `"max-bundle"`, `"require"` |
+| **Authentication** | `SignalingAuth` sealed interface | Bearer, Cookies, CookieStorage, Custom headers |
+| **HTTP behavior** | Inject custom `HttpClient` | Timeout, SSL pinning, interceptors |
+| **Signaling protocol** | Implement `SignalingAdapter` | WebSocket, Firebase, MQTT, gRPC, etc. |
+| **Audio processing** | `AudioPushConfig` | Echo cancellation, noise suppression, auto gain |
+| **Retry strategy** | `RetryConfig` | Max retries, delays, backoff factor, jitter |
+| **DataChannel reliability** | `DataChannelConfig` presets | `reliable()`, `unreliable()`, `maxLifetime()` |
+
+### Known Limitations
+
+| Limitation | Details | Workaround |
+|-----------|---------|------------|
+| **No dynamic URL change** | `url` is immutable after adapter creation | `session.close()` → create new adapter + session |
+| **No video codec preference** | Cannot specify H.264 vs VP8 priority | Uses platform default negotiation |
+| **No audio sample rate control** | Uses platform default (typically Opus 48kHz) | N/A — Opus auto-negotiates |
+| **No SDP manipulation** | SDP munging not exposed | Implement custom `SignalingAdapter` to modify SDP in `sendOffer()` |
+| **No dynamic auth refresh** | Auth tokens are set at adapter creation | Close session → create new adapter with fresh token |
+| **iOS Simulator** | GoogleWebRTC has no simulator binaries | Use physical device |
+
+> **Design rationale**: Adapters and sessions are intentionally immutable after creation. This prevents mid-connection state corruption and ensures thread safety across coroutine scopes. To change any connection parameter, close the current session and create a new one.
 
 ---
 
