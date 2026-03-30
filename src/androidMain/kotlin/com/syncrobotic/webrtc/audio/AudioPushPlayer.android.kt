@@ -120,7 +120,16 @@ actual class AudioPushClient actual constructor(
     actual override fun stop() = impl.stop()
     actual override fun setMuted(muted: Boolean) = impl.setMuted(muted)
     actual override suspend fun refreshStats() = impl.refreshStats()
+    @Deprecated(
+        message = "Use close() instead for consistent naming with Session API. Will be removed in v3.0.",
+        replaceWith = ReplaceWith("close()")
+    )
     actual fun release() = impl.release()
+
+    actual fun close() {
+        @Suppress("DEPRECATION")
+        release()
+    }
 }
 
 /**

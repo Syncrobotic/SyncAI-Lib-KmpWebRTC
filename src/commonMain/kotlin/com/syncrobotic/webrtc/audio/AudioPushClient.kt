@@ -47,5 +47,17 @@ expect class AudioPushClient(
      * Call this when the client is no longer needed.
      * After calling release(), the client cannot be reused.
      */
+    @Deprecated(
+        message = "Use close() instead for consistent naming with Session API. Will be removed in v3.0.",
+        replaceWith = ReplaceWith("close()")
+    )
     fun release()
+
+    /**
+     * Release all resources.
+     *
+     * Call this when the client is no longer needed.
+     * After calling close(), the client cannot be reused.
+     */
+    fun close()
 }

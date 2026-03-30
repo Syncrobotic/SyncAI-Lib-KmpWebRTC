@@ -176,7 +176,17 @@ interface WebRTCListener {
     fun onAudioData(data: AudioData) {}
     
     /** Called when an error occurs */
+    @Deprecated(
+        message = "Use onError(Throwable) for richer error context. Will be removed in v3.0.",
+        replaceWith = ReplaceWith("onError(Throwable)")
+    )
     fun onError(error: String) {}
+
+    /** Called when an error occurs */
+    fun onError(error: Throwable) {
+        @Suppress("DEPRECATION")
+        onError(error.message ?: error.toString())
+    }
     
     /** Called when remote stream is added */
     fun onRemoteStreamAdded() {}
