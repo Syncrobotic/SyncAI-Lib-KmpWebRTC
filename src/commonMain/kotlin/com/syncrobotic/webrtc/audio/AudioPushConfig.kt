@@ -75,6 +75,10 @@ data class AudioPushConfig(
  * @param maxDelayMs Maximum delay between retries in milliseconds
  * @param multiplier Multiplier for exponential backoff
  */
+@Deprecated(
+    message = "Use RetryConfig instead. AudioRetryConfig will be removed in v3.0.",
+    replaceWith = ReplaceWith("RetryConfig", "com.syncrobotic.webrtc.config.RetryConfig")
+)
 data class AudioRetryConfig(
     val maxAttempts: Int = 3,
     val initialDelayMs: Long = 1000L,
