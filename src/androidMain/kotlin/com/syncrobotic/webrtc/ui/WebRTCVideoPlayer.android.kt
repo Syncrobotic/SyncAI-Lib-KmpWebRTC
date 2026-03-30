@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.syncrobotic.webrtc.ui
 
 import android.content.Context

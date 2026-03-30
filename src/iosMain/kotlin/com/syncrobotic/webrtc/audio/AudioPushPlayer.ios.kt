@@ -1,7 +1,11 @@
+@file:Suppress("DEPRECATION")
+
 package com.syncrobotic.webrtc.audio
 
 import androidx.compose.runtime.*
 import com.syncrobotic.webrtc.*
+import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WhipSession
 import com.syncrobotic.webrtc.signaling.WhipSignaling
 import io.ktor.client.*
 import io.ktor.client.engine.darwin.*
@@ -12,9 +16,37 @@ import platform.AVFAudio.*
 import platform.Foundation.NSLog
 
 /**
- * iOS implementation of AudioPushPlayer.
- * Uses WebRTCClient for audio push via WHIP protocol.
+ * iOS implementation of session-based AudioPushPlayer.
  */
+@Composable
+actual fun AudioPushPlayer(
+    session: WhipSession,
+    autoStart: Boolean,
+    onStateChange: ((AudioPushState) -> Unit)?,
+): AudioPushController {
+    val sessionState by session.state.collectAsState()
+
+    LaunchedEffect(session, autoStart) {
+        if (autoStart && (session.state.value == SessionState.Idle || session.state.value is SessionState.Error)) {
+            session.connect()
+        }
+    }
+
+    LaunchedEffect(sessionState) {
+        onStateChange?.invoke(sessionState.toAudioPushState())
+    }
+
+    DisposableEffect(session) {
+        onDispose { /* Session lifecycle managed by user */ }
+    }
+
+    return remember(session) { SessionAudioPushController(session) }
+}
+
+/**
+ * iOS implementation of AudioPushPlayer (legacy config-based API).
+ */
+@Suppress("DEPRECATION")
 @Composable
 actual fun AudioPushPlayer(
     config: AudioPushConfig,
@@ -49,6 +81,7 @@ actual fun AudioPushPlayer(
 /**
  * Remember an AudioPushController with automatic lifecycle management.
  */
+@Suppress("DEPRECATION")
 @Composable
 actual fun rememberAudioPushController(
     config: AudioPushConfig,

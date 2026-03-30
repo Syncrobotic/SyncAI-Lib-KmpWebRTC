@@ -196,6 +196,10 @@ interface WebRTCListener {
  * Cross-platform WebRTC client interface.
  * Platform implementations will wrap native WebRTC libraries.
  */
+@Deprecated(
+    message = "Use WhepSession/WhipSession instead. Will become internal in v3.0.",
+    replaceWith = ReplaceWith("WhepSession or WhipSession", "com.syncrobotic.webrtc.session.WhepSession", "com.syncrobotic.webrtc.session.WhipSession")
+)
 expect class WebRTCClient {
     /**
      * Initialize the WebRTC client with configuration.

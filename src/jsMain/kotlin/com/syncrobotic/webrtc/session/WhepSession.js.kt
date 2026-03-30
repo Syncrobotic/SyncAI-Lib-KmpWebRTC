@@ -1,0 +1,44 @@
+package com.syncrobotic.webrtc.session
+
+import com.syncrobotic.webrtc.WebRTCStats
+import com.syncrobotic.webrtc.config.RetryConfig
+import com.syncrobotic.webrtc.config.WebRTCConfig
+import com.syncrobotic.webrtc.datachannel.DataChannel
+import com.syncrobotic.webrtc.datachannel.DataChannelConfig
+import com.syncrobotic.webrtc.signaling.SignalingAdapter
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+/**
+ * JavaScript/Browser implementation of [WhepSession].
+ * Uses native RTCPeerConnection via browser APIs.
+ */
+actual class WhepSession actual constructor(
+    private val signaling: SignalingAdapter,
+    private val config: WebRTCConfig,
+    private val retryConfig: RetryConfig
+) {
+    private val _state = MutableStateFlow<SessionState>(SessionState.Idle)
+    actual val state: StateFlow<SessionState> = _state.asStateFlow()
+
+    private val _stats = MutableStateFlow<WebRTCStats?>(null)
+    actual val stats: StateFlow<WebRTCStats?> = _stats.asStateFlow()
+
+    actual suspend fun connect() {
+        _state.value = SessionState.Error(
+            message = "JS WhepSession not yet fully implemented",
+            isRetryable = false
+        )
+    }
+
+    actual fun createDataChannel(config: DataChannelConfig): DataChannel? = null
+
+    actual fun setAudioEnabled(enabled: Boolean) {}
+
+    actual fun setSpeakerphoneEnabled(enabled: Boolean) {}
+
+    actual fun close() {
+        _state.value = SessionState.Closed
+    }
+}

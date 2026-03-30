@@ -9,6 +9,7 @@ import com.syncrobotic.webrtc.config.BidirectionalConfig
 /**
  * JVM/Desktop implementation of BidirectionalPlayer.
  */
+@Suppress("DEPRECATION")
 @Composable
 actual fun BidirectionalPlayer(
     config: BidirectionalConfig,
@@ -75,6 +76,7 @@ actual fun BidirectionalPlayer(
 /**
  * Remember a BidirectionalController with automatic lifecycle management.
  */
+@Suppress("DEPRECATION")
 @Composable
 actual fun rememberBidirectionalController(
     config: BidirectionalConfig,

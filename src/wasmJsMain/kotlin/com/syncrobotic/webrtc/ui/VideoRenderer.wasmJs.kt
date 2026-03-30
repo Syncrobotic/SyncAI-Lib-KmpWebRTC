@@ -9,16 +9,41 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.syncrobotic.webrtc.config.StreamConfig
+import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WhepSession
 
 /**
- * WebAssembly (Browser) implementation of VideoRenderer.
- * 
- * Note: For WasmJS/Browser, use native HTML5 video element with WebRTC MediaStream directly.
- * This Composable is provided for API compatibility.
- * 
- * For full WasmJS WebRTC support, use the WebRTCClient directly and attach
- * the MediaStream to an HTML video element via JS interop.
+ * WasmJS implementation of session-based VideoRenderer.
+ * Stub — full browser support not yet implemented.
  */
+@Composable
+actual fun VideoRenderer(
+    session: WhepSession,
+    modifier: Modifier,
+    onStateChange: ((PlayerState) -> Unit)?,
+    onEvent: ((PlayerEvent) -> Unit)?,
+): VideoPlayerController {
+    val sessionState by session.state.collectAsState()
+
+    LaunchedEffect(session) {
+        if (session.state.value == SessionState.Idle) {
+            session.connect()
+        }
+    }
+
+    LaunchedEffect(sessionState) {
+        onStateChange?.invoke(sessionState.toPlayerState())
+    }
+
+    SessionVideoPlaceholder(sessionState, modifier)
+
+    return remember { WasmJsVideoPlayerController() }
+}
+
+/**
+ * WasmJS implementation of VideoRenderer (legacy config-based API).
+ */
+@Suppress("DEPRECATION")
 @Composable
 actual fun VideoRenderer(
     config: StreamConfig,
@@ -26,7 +51,6 @@ actual fun VideoRenderer(
     onStateChange: OnPlayerStateChange,
     onEvent: OnPlayerEvent
 ) {
-    // For WasmJS, recommend using native HTML video element
     Box(
         modifier = modifier.fillMaxSize().background(Color.Black),
         contentAlignment = Alignment.Center
@@ -75,6 +99,7 @@ private class WasmJsVideoPlayerController : VideoPlayerController {
         get() = _isPlaying
 }
 
+@Suppress("DEPRECATION")
 @Composable
 actual fun rememberVideoPlayerController(config: StreamConfig): VideoPlayerController {
     return remember { WasmJsVideoPlayerController() }
