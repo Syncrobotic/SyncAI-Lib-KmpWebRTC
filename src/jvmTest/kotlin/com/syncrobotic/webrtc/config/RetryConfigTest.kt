@@ -58,9 +58,9 @@ class RetryConfigTest {
     @Test
     fun `RC-06 AGGRESSIVE preset`() {
         val config = RetryConfig.AGGRESSIVE
-        assertEquals(5, config.maxRetries)
+        assertEquals(10, config.maxRetries)
         assertEquals(500L, config.initialDelayMs)
-        assertEquals(10000L, config.maxDelayMs)
+        assertEquals(60000L, config.maxDelayMs)
         assertEquals(1.5, config.backoffFactor)
     }
 

@@ -54,7 +54,7 @@ class SessionStateTest {
         val state = SessionState.Error(message = "timeout")
         assertEquals("timeout", state.message)
         assertNull(state.cause)
-        assertFalse(state.isRetryable)
+        assertTrue(state.isRetryable)
     }
 
     @Test

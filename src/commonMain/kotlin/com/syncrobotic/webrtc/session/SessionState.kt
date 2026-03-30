@@ -30,7 +30,7 @@ sealed class SessionState {
     data class Error(
         val message: String,
         val cause: Throwable? = null,
-        val isRetryable: Boolean = false
+        val isRetryable: Boolean = true
     ) : SessionState()
 
     /** Session closed. Terminal state — create a new session to reconnect. */

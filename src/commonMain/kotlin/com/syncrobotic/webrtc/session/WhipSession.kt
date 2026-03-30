@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
  */
 expect class WhipSession(
     signaling: SignalingAdapter,
-    audioConfig: AudioPushConfig = AudioPushConfig(whipUrl = ""),
+    audioConfig: AudioPushConfig = AudioPushConfig(),
     retryConfig: RetryConfig = RetryConfig.DEFAULT
 ) {
     /** Reactive connection state. */

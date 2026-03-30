@@ -39,11 +39,11 @@ data class RetryConfig(
         /** Default retry configuration: 5 retries with exponential backoff 1s → 2s → 4s → 8s → 16s */
         val DEFAULT = RetryConfig()
 
-        /** Aggressive retry for critical streams: 5 retries, faster first retry */
+        /** Aggressive retry for critical streams: 10 retries, faster first retry */
         val AGGRESSIVE = RetryConfig(
-            maxRetries = 5,
+            maxRetries = 10,
             initialDelayMs = 500L,
-            maxDelayMs = 10000L,
+            maxDelayMs = 60000L,
             backoffFactor = 1.5
         )
 

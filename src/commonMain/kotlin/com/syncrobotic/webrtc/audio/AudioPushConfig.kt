@@ -14,7 +14,7 @@ import com.syncrobotic.webrtc.config.WebRTCConfig
  * @param retryConfig Configuration for automatic reconnection
  */
 data class AudioPushConfig(
-    val whipUrl: String,
+    val whipUrl: String = "",
     val webrtcConfig: WebRTCConfig = WebRTCConfig.SENDER,
     val enableEchoCancellation: Boolean = true,
     val enableNoiseSuppression: Boolean = true,
