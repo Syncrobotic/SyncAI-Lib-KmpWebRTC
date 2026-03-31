@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.3.0...v1.4.0) (2026-03-31)
+
+
+### Features
+
+* trigger release-please ([c26af4e](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/c26af4eab1381d9535d0bac269d43ed702a2ba2c))
+* trigger release-please ([d4b6ed6](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/d4b6ed6d54009ce95a332b37c06355ec3bb8a8f7))
+
 ## [1.3.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.2.0...v1.3.0) (2026-03-31)
 
 
