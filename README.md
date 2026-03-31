@@ -1910,3 +1910,31 @@ MIT License
 ## Contributing
 
 Issues and Pull Requests are welcome!
+
+### Development Setup
+
+After cloning the repository, build the project once to automatically install Git hooks:
+
+```bash
+./gradlew build
+```
+
+This runs the `installGitHooks` task, which configures `git core.hooksPath` to `.githooks/`. A **pre-push hook** will then run `./gradlew jvmTest` before every `git push` — if tests fail, the push is blocked.
+
+> If you skip the initial build, you can install hooks manually:
+> ```bash
+> ./gradlew installGitHooks
+> ```
+
+### Commit Convention
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) (required by release-please):
+
+| Type | Example |
+|------|---------|
+| `feat:` | `feat: add DataChannelSession` |
+| `fix:` | `fix: resolve reconnect on ICE FAILED` |
+| `docs:` | `docs: update README examples` |
+| `refactor:` | `refactor: extract signaling interface` |
+| `test:` | `test: add RetryConfig unit tests` |
+| `perf:` | `perf: reduce JVM video memory usage` |
