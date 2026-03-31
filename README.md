@@ -1075,10 +1075,13 @@ data class RetryConfig(
     companion object {
         val DEFAULT: RetryConfig        // 5 retries, 1s → 45s
         val AGGRESSIVE: RetryConfig     // 10 retries, 500ms → 60s
+        val PERSISTENT: RetryConfig     // Unlimited retries, 1s → 45s (recommended for IoT/unattended)
         val DISABLED: RetryConfig       // No retries
     }
 }
 ```
+
+> **Reconnect behavior**: Both `DISCONNECTED` (temporary loss) and `FAILED` (ICE failure) trigger auto-reconnect. After all retries are exhausted, the session enters `SessionState.Error`. Use `PERSISTENT` for unattended scenarios (IoT, robotics) where the app should keep retrying indefinitely until `session.close()` is called.
 
 ---
 
