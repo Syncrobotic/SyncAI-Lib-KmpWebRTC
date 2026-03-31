@@ -110,6 +110,22 @@ The SDK is organized into three layers. Application code interacts with **Layer 
 | **Compose UI** | Cross-platform `VideoRenderer` and `AudioPushPlayer` composables |
 | **Session API** | High-level `WhepSession`/`WhipSession` — no SDP/ICE knowledge required |
 
+### Server Compatibility
+
+The built-in `WhepSignalingAdapter` / `WhipSignalingAdapter` work with any server that implements the standard [WHEP](https://www.ietf.org/archive/id/draft-murillo-whep-03.html) / [WHIP](https://www.ietf.org/archive/id/draft-ietf-wish-whip-01.html) protocol. For non-standard signaling, implement the `SignalingAdapter` interface (see [Custom Signaling Adapter](#5-custom-signaling-adapter)).
+
+| Media Server | WHEP (Receive) | WHIP (Send) | Notes |
+|-------------|:-:|:-:|-------|
+| **MediaMTX** | ✅ | ✅ | Works out of the box with built-in adapters |
+| **Cloudflare Stream** | ✅ | ✅ | Works out of the box with built-in adapters |
+| **GStreamer** (whipsink/whepsrc) | ✅ | ✅ | Works out of the box with built-in adapters |
+| **Dolby.io / Millicast** | ✅ | ✅ | Works out of the box with built-in adapters |
+| **OBS Studio** (v30+) | — | ✅ | OBS WHIP output only |
+| **Janus Gateway** | ❌ | ❌ | Custom `SignalingAdapter` required (proprietary API) |
+| **LiveKit** | ❌ | ❌ | Custom `SignalingAdapter` required (proprietary signaling) |
+| **Ant Media Server** | ❌ | ❌ | Custom `SignalingAdapter` required (WebSocket-based) |
+| **Custom Backend** | — | — | Implement `SignalingAdapter` for any protocol (WebSocket, gRPC, Firebase, MQTT, etc.) |
+
 ---
 
 ## Installation
