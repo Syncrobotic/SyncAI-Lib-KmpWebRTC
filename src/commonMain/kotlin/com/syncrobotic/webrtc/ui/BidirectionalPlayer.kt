@@ -122,6 +122,10 @@ typealias OnBidirectionalStateChange = (BidirectionalState) -> Unit
  * @param onVideoEvent Callback for video player events
  * @return A BidirectionalController for managing the streams
  */
+@Deprecated(
+    message = "Use VideoRenderer(session: WhepSession) + AudioPushPlayer(session: WhipSession) separately. Will be removed in v3.0.",
+    replaceWith = ReplaceWith("VideoRenderer(whepSession) and AudioPushPlayer(whipSession)")
+)
 @Composable
 expect fun BidirectionalPlayer(
     config: BidirectionalConfig,
@@ -137,6 +141,10 @@ expect fun BidirectionalPlayer(
  * @param onStateChange Callback for state changes
  * @return A BidirectionalController
  */
+@Deprecated(
+    message = "Use VideoRenderer(session: WhepSession) + AudioPushPlayer(session: WhipSession) separately. Will be removed in v3.0.",
+    replaceWith = ReplaceWith("VideoRenderer(whepSession) and AudioPushPlayer(whipSession)")
+)
 @Composable
 expect fun rememberBidirectionalController(
     config: BidirectionalConfig,

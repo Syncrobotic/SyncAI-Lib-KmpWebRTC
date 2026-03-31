@@ -43,6 +43,26 @@ jobs:
       - name: Run tests
         run: ./gradlew jvmTest
 
+      - name: Test summary
+        if: always()
+        run: |
+          XML_DIR="build/test-results/jvmTest"
+          if [ -d "$XML_DIR" ]; then
+            TESTS=$(grep -roh 'tests="[0-9]*"' "$XML_DIR" | grep -o '[0-9]*' | paste -sd+ - | bc)
+            FAILURES=$(grep -roh 'failures="[0-9]*"' "$XML_DIR" | grep -o '[0-9]*' | paste -sd+ - | bc)
+            ERRORS=$(grep -roh 'errors="[0-9]*"' "$XML_DIR" | grep -o '[0-9]*' | paste -sd+ - | bc)
+            SKIPPED=$(grep -roh 'skipped="[0-9]*"' "$XML_DIR" | grep -o '[0-9]*' | paste -sd+ - | bc)
+            PASSED=$((TESTS - FAILURES - ERRORS - SKIPPED))
+            echo "## Test Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Total | Passed | Failed | Errors | Skipped |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|-------|--------|--------|--------|---------|" >> "$GITHUB_STEP_SUMMARY"
+            echo "| $TESTS | $PASSED | $FAILURES | $ERRORS | $SKIPPED |" >> "$GITHUB_STEP_SUMMARY"
+            echo ""
+            echo "📊 Tests: $TESTS | ✅ Passed: $PASSED | ❌ Failed: $FAILURES | 🚨 Errors: $ERRORS | ⏭️ Skipped: $SKIPPED"
+          else
+            echo "⚠️ No test results found at $XML_DIR"
+          fi
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

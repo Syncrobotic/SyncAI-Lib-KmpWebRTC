@@ -8,8 +8,9 @@ SyncAI-Lib-KmpWebRTC is a Kotlin Multiplatform WebRTC client library supporting 
 
 - **Single-module KMP structure**: All code resides in a single Gradle module
 - **expect/actual pattern**: Shared interfaces defined in `src/commonMain/`, each platform provides `actual` implementations in corresponding source sets
-- **Compose Multiplatform**: UI components use Compose (`VideoRenderer`, `AudioPushPlayer`, `BidirectionalPlayer`)
-- **Package**: `com.syncrobotic.webrtc` (sub-packages: `config`, `signaling`, `audio`, `ui`, `datachannel`)
+- **Compose Multiplatform**: UI components use Compose (`VideoRenderer`, `AudioPushPlayer`); `BidirectionalPlayer` is deprecated
+- **Three-layer architecture**: Layer 1 (SignalingAdapter) → Layer 2 (WhepSession/WhipSession) → Layer 3 (Composables)
+- **Package**: `com.syncrobotic.webrtc` (sub-packages: `config`, `signaling`, `session`, `audio`, `ui`, `datachannel`)
 
 ### Source Set Structure
 
@@ -34,6 +35,8 @@ SyncAI-Lib-KmpWebRTC is a Kotlin Multiplatform WebRTC client library supporting 
 ## Docs Reference
 
 Project architecture and specification documents are stored in the `docs/` directory. Verify generated code conforms to design principles before committing:
+- [docs/README_V2.md](../docs/README_V2.md): v2 API design and usage examples
+- [docs/MIGRATION_PLAN.md](../docs/MIGRATION_PLAN.md): v1 → v2 migration phases and checklist
 - [docs/ROADMAP.md](../docs/ROADMAP.md): Feature planning and milestones
 
 ## Code Review Checklist
@@ -44,6 +47,7 @@ When generating or modifying code, ask yourself:
 - [ ] Is the interface segregation principle maintained (small, focused interfaces)?
 - [ ] Are new dependencies introduced? If so, they must be added to `gradle/libs.versions.toml`
 - [ ] Does error handling use sealed class states (e.g. `PlayerState.Error`)?
+- [ ] Does new signaling code use `SignalingAdapter` interface (not legacy `WhepSignaling`/`WhipSignaling`)?
 - [ ] Could this break existing platform actual implementations?
 
 ## Commit Rules
@@ -86,12 +90,13 @@ Commit messages must be in English, following Conventional Commits (release-plea
 
 - **PeerConnectionFactory management**: Android creates a separate Factory per connection (to avoid EglContext conflicts); JVM uses reference counting to share a single Factory
 - **Multi-instance safety**: Multiple `VideoRenderer` / `WebRTCClient` instances can run simultaneously with no shared state conflicts
-- **Signaling**: Currently uses concrete classes (`WhepSignaling`, `WhipSignaling`, `WebSocketSignaling`); abstract interface planned
+- **Signaling**: Uses `SignalingAdapter` interface with built-in `WhepSignalingAdapter`/`WhipSignalingAdapter`; legacy `WhepSignaling`/`WhipSignaling`/`WebSocketSignaling` are `@Deprecated` (will be removed in v3.0)
 - **Version management**: Managed automatically by release-please; version defined in `gradle.properties`
 - **Dependency definitions**: Uses version catalog `gradle/libs.versions.toml`, referenced in code as `webrtcLibs.xxx`
 - **iOS Simulator**: GoogleWebRTC does not support iOS Simulator; physical device only
 - **Logging**: Currently uses platform-native logging (Android `Log.d`, iOS `NSLog`, JVM `println`); unified Logger abstraction planned (see ROADMAP Phase 2)
-- **Error handling**: Uses sealed class states for errors (`PlayerState.Error`, `AudioPushState.Error`); Signaling layer uses custom Exceptions (`WhepException`, `WhipException`)
+- **Error handling**: Uses sealed class states for errors (`PlayerState.Error`, `AudioPushState.Error`); Signaling layer uses custom Exceptions (`WhepException`, `WhipException` with `WhipErrorCode`)
+- **Deprecated types (v2 migration)**: `AudioRetryConfig` (use `RetryConfig`), `StreamProtocol`, `StreamDirection`, `SignalingType`, `WebSocketSignalingConfig`, `ServerEndpoints`, `BidirectionalConfig`, and `WebRTCConfig.signalingType/wsConfig/whepEnabled/whipEnabled` — all marked `@Deprecated`, will be removed in v3.0
 
 ## Key Dependencies
 

@@ -1,26 +1,103 @@
 package com.syncrobotic.webrtc.ui
 
+import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.syncrobotic.webrtc.config.StreamConfig
 import com.syncrobotic.webrtc.config.StreamProtocol
+import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WhepSession
+import org.webrtc.SurfaceViewRenderer
 
 /**
- * Android implementation of VideoRenderer.
- * 
- * Currently supports:
- * - WebRTC streams via WebRTC-SDK Android (routes to WebRTCVideoPlayer)
- * 
- * Note: HLS/RTSP support requires ExoPlayer (Media3) which is not currently
- * bundled in the SDK. For non-WebRTC streams, consider using the WebRTC
- * fallback or adding ExoPlayer dependencies to your project.
+ * Android implementation of session-based VideoRenderer.
+ *
+ * Auto-connects the [WhepSession] (if idle), creates a [SurfaceViewRenderer]
+ * for the session's internal WebRTC client, and maps session state to
+ * [PlayerState].
  */
+@Composable
+actual fun VideoRenderer(
+    session: WhepSession,
+    modifier: Modifier,
+    onStateChange: ((PlayerState) -> Unit)?,
+    onEvent: ((PlayerEvent) -> Unit)?,
+): VideoPlayerController {
+    val context = LocalContext.current
+    var surfaceViewRenderer by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
+    val sessionState by session.state.collectAsState()
+    val connectionStartTime = remember { System.currentTimeMillis() }
+    var hasReportedFirstFrame by remember { mutableStateOf(false) }
+
+    // Set up video rendering callback and auto-connect
+    LaunchedEffect(session) {
+        session.onClientReady = { client, ctx ->
+            surfaceViewRenderer = client.createSurfaceViewRenderer(ctx)
+        }
+        session.setContext(context)
+        if (session.state.value == SessionState.Idle || session.state.value is SessionState.Error) {
+            session.connect()
+        }
+    }
+
+    // Map SessionState → PlayerState + fire onEvent
+    LaunchedEffect(sessionState) {
+        val playerState = sessionState.toPlayerState()
+        onStateChange?.invoke(playerState)
+        if (sessionState == SessionState.Connected && !hasReportedFirstFrame) {
+            hasReportedFirstFrame = true
+            val elapsed = System.currentTimeMillis() - connectionStartTime
+            onEvent?.invoke(PlayerEvent.FirstFrameRendered(elapsed))
+        }
+    }
+
+    // Render video or placeholder
+    val renderer = surfaceViewRenderer
+    if (renderer != null) {
+        AndroidView(
+            factory = {
+                renderer.apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+            },
+            modifier = modifier
+        )
+    } else {
+        SessionVideoPlaceholder(sessionState, modifier)
+    }
+
+    // Cleanup callback on dispose
+    DisposableEffect(session) {
+        onDispose {
+            session.onClientReady = null
+        }
+    }
+
+    return remember(session) { SessionVideoPlayerController(session) }
+}
+
+/**
+ * Android implementation of VideoRenderer (legacy config-based API).
+ */
+@Suppress("DEPRECATION")
 @Composable
 actual fun VideoRenderer(
     config: StreamConfig,
@@ -93,6 +170,7 @@ private class AndroidVideoPlayerController : VideoPlayerController {
         get() = _isPlaying
 }
 
+@Suppress("DEPRECATION")
 @Composable
 actual fun rememberVideoPlayerController(config: StreamConfig): VideoPlayerController {
     return remember { AndroidVideoPlayerController() }

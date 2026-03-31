@@ -39,11 +39,11 @@ data class RetryConfig(
         /** Default retry configuration: 5 retries with exponential backoff 1s → 2s → 4s → 8s → 16s */
         val DEFAULT = RetryConfig()
 
-        /** Aggressive retry for critical streams: 5 retries, faster first retry */
+        /** Aggressive retry for critical streams: 10 retries, faster first retry */
         val AGGRESSIVE = RetryConfig(
-            maxRetries = 5,
+            maxRetries = 10,
             initialDelayMs = 500L,
-            maxDelayMs = 10000L,
+            maxDelayMs = 60000L,
             backoffFactor = 1.5
         )
 
@@ -55,6 +55,9 @@ data class RetryConfig(
 /**
  * Supported streaming protocols.
  */
+@Deprecated(
+    message = "Library only supports WebRTC. StreamProtocol will be removed in v3.0."
+)
 enum class StreamProtocol {
     /** Real Time Streaming Protocol - low latency, widely supported */
     RTSP,
@@ -67,6 +70,9 @@ enum class StreamProtocol {
 /**
  * Stream direction for WebRTC connections.
  */
+@Deprecated(
+    message = "Direction is determined by Session type (WHEP=receive, WHIP=send). Will be removed in v3.0."
+)
 enum class StreamDirection {
     /** Only receive media (watching a stream) */
     RECEIVE_ONLY,
@@ -89,6 +95,10 @@ enum class IceMode {
 /**
  * WebRTC signaling transport type.
  */
+@Deprecated(
+    message = "Use SignalingAdapter instead. SignalingType will be removed in v3.0.",
+    replaceWith = ReplaceWith("SignalingAdapter", "com.syncrobotic.webrtc.signaling.SignalingAdapter")
+)
 enum class SignalingType {
     /** WHEP/WHIP over HTTP(S) - standard for streaming, Cloudflare, etc. */
     WHEP_HTTP,
@@ -106,6 +116,9 @@ enum class SignalingType {
  * @param reconnectOnFailure Whether to auto-reconnect on connection loss
  * @param heartbeatIntervalMs Heartbeat interval in milliseconds (0 to disable)
  */
+@Deprecated(
+    message = "Use a custom SignalingAdapter implementation instead. Will be removed in v3.0."
+)
 data class WebSocketSignalingConfig(
     val url: String,
     val streamName: String = "raw",
@@ -163,10 +176,14 @@ data class IceServer(
  * @param rtcpMuxPolicy RTCP multiplexing policy ("require" or "negotiate")
  */
 data class WebRTCConfig(
-    val signalingType: SignalingType = SignalingType.WHEP_HTTP,
+    @Deprecated("Use SignalingAdapter instead. Will be removed in v3.0.")
+    val signalingType: SignalingType = @Suppress("DEPRECATION") SignalingType.WHEP_HTTP,
     val iceServers: List<IceServer> = IceServer.DEFAULT_ICE_SERVERS,
+    @Deprecated("Use a custom SignalingAdapter implementation instead. Will be removed in v3.0.")
     val wsConfig: WebSocketSignalingConfig? = null,
+    @Deprecated("Session type determines direction. Use WhepSignalingAdapter. Will be removed in v3.0.")
     val whepEnabled: Boolean = true,
+    @Deprecated("Session type determines direction. Use WhipSignalingAdapter. Will be removed in v3.0.")
     val whipEnabled: Boolean = false,
     val iceTransportPolicy: String = "all",
     val bundlePolicy: String = "max-bundle",
@@ -226,6 +243,9 @@ data class WebRTCConfig(
  * @param hls HLS URL (e.g., "http://10.42.0.98:8888/raw/index.m3u8")
  * @param webrtc WebRTC WHEP URL (e.g., "http://10.42.0.98:8889/raw")
  */
+@Deprecated(
+    message = "Use SignalingAdapter with direct URL instead. ServerEndpoints will be removed in v3.0."
+)
 data class ServerEndpoints(
     val rtsp: String,
     val hls: String,
