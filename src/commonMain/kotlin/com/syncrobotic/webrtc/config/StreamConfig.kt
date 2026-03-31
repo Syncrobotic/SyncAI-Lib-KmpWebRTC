@@ -47,6 +47,14 @@ data class RetryConfig(
             backoffFactor = 1.5
         )
 
+        /** Persistent retry for unattended/IoT use: unlimited retries with exponential backoff up to 45s */
+        val PERSISTENT = RetryConfig(
+            maxRetries = Int.MAX_VALUE,
+            initialDelayMs = 1000L,
+            maxDelayMs = 45000L,
+            backoffFactor = 2.0
+        )
+
         /** No automatic retry */
         val DISABLED = RetryConfig(maxRetries = 0)
     }

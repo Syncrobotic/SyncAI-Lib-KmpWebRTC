@@ -198,3 +198,15 @@ publishing {
         }
     }
 }
+
+// Auto-configure git hooks path on first build (like Husky for JS)
+tasks.register<Exec>("installGitHooks") {
+    description = "Configures git to use .githooks/ directory for hooks"
+    group = "git"
+    commandLine("git", "config", "core.hooksPath", ".githooks")
+}
+
+// Run installGitHooks automatically after project evaluation
+tasks.named("compileKotlinJvm") {
+    dependsOn("installGitHooks")
+}
