@@ -195,11 +195,10 @@ fun VideoScreen() {
     // 2. Create session (once)
     val session = remember { WhepSession(signaling) }
 
-    // 3. Connect and manage lifecycle
-    LaunchedEffect(session) { session.connect() }
+    // 3. Manage lifecycle (VideoRenderer auto-connects; do NOT call session.connect() manually)
     DisposableEffect(session) { onDispose { session.close() } }
 
-    // 4. Render video
+    // 4. Render video — auto-connects and sets up video sink internally
     val controller = VideoRenderer(
         session = session,
         modifier = Modifier.fillMaxSize(),
@@ -855,6 +854,8 @@ expect class WhipSession(
 
 Compose Multiplatform composable for rendering video from a `WhepSession`. Works on Android, iOS, and JVM/Desktop.
 
+> **Important**: `VideoRenderer` **auto-connects** the session internally. Do **not** call `session.connect()` manually when using `VideoRenderer` — this causes a race condition where the video sink is not attached, resulting in a black screen. Only use `DisposableEffect` for cleanup.
+
 ```kotlin
 @Composable
 expect fun VideoRenderer(
@@ -1175,14 +1176,14 @@ fun CameraView(streamUrl: String) {
     val signaling = remember { WhepSignalingAdapter(url = streamUrl) }
     val session = remember { WhepSession(signaling) }
 
-    LaunchedEffect(session) { session.connect() }
+    // VideoRenderer auto-connects; do NOT call session.connect() manually
     DisposableEffect(session) { onDispose { session.close() } }
 
     // Observe state for UI feedback
     val sessionState by session.state.collectAsState()
 
     Column {
-        // Video
+        // Video — auto-connects on first composition
         VideoRenderer(
             session = session,
             modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
@@ -1617,7 +1618,7 @@ fun main() = application {
         val signaling = remember { WhepSignalingAdapter(url = "https://server/stream/whep") }
         val session = remember { WhepSession(signaling) }
 
-        LaunchedEffect(session) { session.connect() }
+        // VideoRenderer auto-connects; do NOT call session.connect() manually
         DisposableEffect(session) { onDispose { session.close() } }
 
         VideoRenderer(session = session, modifier = Modifier.fillMaxSize())
