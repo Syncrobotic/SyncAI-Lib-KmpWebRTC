@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.2.0...v1.3.0) (2026-03-31)
+
+
+### Features
+
+* add RetryConfig.PERSISTENT and trigger reconnect on ICE FAILED ([02f1f4c](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/02f1f4c21bb2f2dd21d70970f3fae1f32c18c412))
+
 ## [1.2.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.1.0...v1.2.0) (2026-03-31)
 
 
