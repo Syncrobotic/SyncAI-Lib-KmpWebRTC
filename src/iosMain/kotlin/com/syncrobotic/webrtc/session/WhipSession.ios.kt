@@ -85,10 +85,7 @@ actual class WhipSession actual constructor(
                     }
                     WebRTCState.FAILED -> {
                         if (!closed) {
-                            _state.value = SessionState.Error(
-                                message = "WebRTC connection failed",
-                                isRetryable = true
-                            )
+                            scope.launch { reconnect() }
                         }
                     }
                     else -> {}
