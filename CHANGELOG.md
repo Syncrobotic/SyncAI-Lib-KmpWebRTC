@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.2.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.1.0...v1.2.0) (2026-03-31)
+
+
+### Features
+
+* add session-based VideoRenderer and AudioPushPlayer, deprecate BidirectionalPlayer and WebRTCClient ([c6b6998](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/c6b6998ceae6ba99b3d3f2e19cb4cdc2e654b447))
+* add SessionStatusOverlay for video disconnect indication ([d257661](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/d2576617b161b37868e5de884b5f8f6e9748f696))
+* add SignalingAdapter interface and WHEP/WHIP adapters (Phase 1) ([b7646ce](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/b7646cead19898621be6df7844e40e580ba2a49a))
+
+
+### Bug Fixes
+
+* add missing Volatile import for iOS session classes ([e485728](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/e485728904757a9dc1e8898430b383229568dc8a))
+* resolve JVM VideoRenderer black screen and color distortion ([194bcbd](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/194bcbd8796ee2b1f26d39a948bfc311e8989ead))
+* restore onEvent callbacks and AudioPushController.start() in v2 composables ([0f668e9](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/0f668e9aa398ebae7957fe341684d4c8247efd05))
+* support DataChannel creation before connect and replay state on setListener ([a658752](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/a658752c5f6f8584943f199a2e67e5a5ea6bd044))
+
 ## [1.1.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.0.1...v1.1.0) (2026-03-30)
 
 
