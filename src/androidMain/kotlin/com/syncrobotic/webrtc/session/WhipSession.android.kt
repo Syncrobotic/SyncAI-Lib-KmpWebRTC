@@ -44,6 +44,9 @@ actual class WhipSession actual constructor(
     @Volatile
     private var closed = false
 
+    @Volatile
+    private var isReconnecting = false
+
     /**
      * Set Android Context for WebRTC initialization.
      * Must be called before [connect] on Android.
@@ -99,13 +102,13 @@ actual class WhipSession actual constructor(
                     }
                     WebRTCState.DISCONNECTED -> {
                         Log.d(TAG, "Disconnected, closed=$closed")
-                        if (!closed) {
+                        if (!closed && !isReconnecting) {
                             scope.launch { reconnect() }
                         }
                     }
                     WebRTCState.FAILED -> {
                         Log.d(TAG, "Failed, closed=$closed")
-                        if (!closed) {
+                        if (!closed && !isReconnecting) {
                             scope.launch { reconnect() }
                         }
                     }
@@ -150,7 +153,8 @@ actual class WhipSession actual constructor(
     }
 
     private suspend fun reconnect() {
-        if (closed) return
+        if (closed || isReconnecting) return
+        isReconnecting = true
         Log.d(TAG, "reconnect() triggered")
         try {
             StreamRetryHandler.withRetry(
@@ -174,6 +178,8 @@ actual class WhipSession actual constructor(
                     isRetryable = false
                 )
             }
+        } finally {
+            isReconnecting = false
         }
     }
 

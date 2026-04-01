@@ -42,6 +42,9 @@ actual class WhipSession actual constructor(
     @Volatile
     private var closed = false
 
+    @Volatile
+    private var isReconnecting = false
+
     actual suspend fun connect() {
         if (closed) return
         println("[WhipSession] [iOS] connect() called, retryConfig=$retryConfig")
@@ -85,13 +88,13 @@ actual class WhipSession actual constructor(
                     }
                     WebRTCState.DISCONNECTED -> {
                         println("[WhipSession] [iOS] Disconnected, closed=$closed")
-                        if (!closed) {
+                        if (!closed && !isReconnecting) {
                             scope.launch { reconnect() }
                         }
                     }
                     WebRTCState.FAILED -> {
                         println("[WhipSession] [iOS] Failed, closed=$closed")
-                        if (!closed) {
+                        if (!closed && !isReconnecting) {
                             scope.launch { reconnect() }
                         }
                     }
@@ -136,7 +139,8 @@ actual class WhipSession actual constructor(
     }
 
     private suspend fun reconnect() {
-        if (closed) return
+        if (closed || isReconnecting) return
+        isReconnecting = true
         println("[WhipSession] [iOS] reconnect() triggered")
         try {
             StreamRetryHandler.withRetry(
@@ -160,6 +164,8 @@ actual class WhipSession actual constructor(
                     isRetryable = false
                 )
             }
+        } finally {
+            isReconnecting = false
         }
     }
 

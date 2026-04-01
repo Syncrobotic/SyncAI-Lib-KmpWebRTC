@@ -45,6 +45,8 @@ actual fun VideoRenderer(
     // Set up video rendering callback and auto-connect
     LaunchedEffect(session) {
         session.onClientReady = { client ->
+            // Reset state for new connection (reconnect scenario)
+            hasReportedFirstFrame = false
             videoView = client.createVideoView()
         }
         if (session.state.value == SessionState.Idle || session.state.value is SessionState.Error) {
@@ -65,10 +67,12 @@ actual fun VideoRenderer(
     // Render video or placeholder
     val view = videoView
     if (view != null) {
-        UIKitView(
-            factory = { view },
-            modifier = modifier,
-        )
+        key(view) {
+            UIKitView(
+                factory = { view },
+                modifier = modifier,
+            )
+        }
     } else {
         SessionVideoPlaceholder(sessionState, modifier)
     }

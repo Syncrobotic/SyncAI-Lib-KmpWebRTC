@@ -62,6 +62,10 @@ actual fun VideoRenderer(
     // Set up video sink and auto-connect
     LaunchedEffect(session) {
         session.onClientReady = { client ->
+            // Reset state for new connection (reconnect scenario)
+            hasReportedFirstFrame = false
+            currentFrame = null
+
             client.setVideoSink(object : dev.onvoid.webrtc.media.video.VideoTrackSink {
                 override fun onVideoFrame(frame: NativeVideoFrame) {
                     val bitmap = convertVideoFrameToImageBitmap(frame)

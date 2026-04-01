@@ -691,6 +691,12 @@ actual class WebRTCClient {
         localAudioTrack = null
         localAudioSource = null
 
+        // Clear video renderer state to prevent stale frame delivery
+        frameCapturingRenderer = null
+        remoteVideoView = null
+        videoTrack = null
+        audioTrack = null
+
         peerConnection?.close()
         peerConnection = null
         peerConnectionDelegate = null

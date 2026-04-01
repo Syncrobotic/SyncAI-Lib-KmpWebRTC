@@ -69,17 +69,19 @@ actual fun VideoRenderer(
     // Render video or placeholder
     val renderer = surfaceViewRenderer
     if (renderer != null) {
-        AndroidView(
-            factory = {
-                renderer.apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
-            },
-            modifier = modifier
-        )
+        key(renderer) {
+            AndroidView(
+                factory = {
+                    renderer.apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                    }
+                },
+                modifier = modifier
+            )
+        }
     } else {
         SessionVideoPlaceholder(sessionState, modifier)
     }

@@ -46,6 +46,9 @@ actual class WhepSession actual constructor(
     @Volatile
     private var closed = false
 
+    @Volatile
+    private var isReconnecting = false
+
     actual suspend fun connect() {
         if (closed) return
         println("[WhepSession] [JVM] connect() called, retryConfig=$retryConfig")
@@ -89,13 +92,13 @@ actual class WhepSession actual constructor(
                     }
                     WebRTCState.DISCONNECTED -> {
                         println("[WhepSession] [JVM] Disconnected, closed=$closed")
-                        if (!closed) {
+                        if (!closed && !isReconnecting) {
                             scope.launch { reconnect() }
                         }
                     }
                     WebRTCState.FAILED -> {
                         println("[WhepSession] [JVM] Failed, closed=$closed")
-                        if (!closed) {
+                        if (!closed && !isReconnecting) {
                             scope.launch { reconnect() }
                         }
                     }
@@ -139,7 +142,8 @@ actual class WhepSession actual constructor(
     }
 
     private suspend fun reconnect() {
-        if (closed) return
+        if (closed || isReconnecting) return
+        isReconnecting = true
         println("[WhepSession] [JVM] reconnect() triggered")
         try {
             StreamRetryHandler.withRetry(
@@ -163,6 +167,8 @@ actual class WhepSession actual constructor(
                     isRetryable = false
                 )
             }
+        } finally {
+            isReconnecting = false
         }
     }
 
