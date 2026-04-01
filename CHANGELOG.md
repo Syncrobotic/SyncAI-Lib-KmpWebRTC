@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.1](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.4.0...v1.4.1) (2026-04-01)
+
+
+### Bug Fixes
+
+* resolve integer overflow in StreamRetryHandler when using PERSISTENT retry config and add session logging across all platforms ([146a459](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/146a4597c6eb8fa46cb2e3efdea192117f763af1))
+* resolve reconnect failures across all platforms (Android/JVM/iOS) ([fc6b99a](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/fc6b99a9528ec335941d320987431e2ff6c2d9d8))
+
 ## [1.4.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.3.0...v1.4.0) (2026-03-31)
 
 
