@@ -44,6 +44,7 @@ actual class WhipSession actual constructor(
 
     actual suspend fun connect() {
         if (closed) return
+        println("[WhipSession] [iOS] connect() called, retryConfig=$retryConfig")
         _state.value = SessionState.Connecting
 
         try {
@@ -59,6 +60,7 @@ actual class WhipSession actual constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            println("[WhipSession] [iOS] connect() failed: ${e::class.simpleName}: ${e.message}")
             if (!closed) {
                 _state.value = SessionState.Error(
                     message = e.message ?: "Connection failed",
@@ -70,20 +72,25 @@ actual class WhipSession actual constructor(
     }
 
     private suspend fun doConnect() {
+        println("[WhipSession] [iOS] doConnect() starting...")
         createdDataChannels.clear()
         client.initializeForSending(audioConfig.webrtcConfig, object : WebRTCListener {
             override fun onConnectionStateChanged(state: WebRTCState) {
+                println("[WhipSession] [iOS] WebRTC state: $state")
                 when (state) {
                     WebRTCState.CONNECTED -> {
+                        println("[WhipSession] [iOS] Connected successfully")
                         _state.value = SessionState.Connected
                         startStatsCollection()
                     }
                     WebRTCState.DISCONNECTED -> {
+                        println("[WhipSession] [iOS] Disconnected, closed=$closed")
                         if (!closed) {
                             scope.launch { reconnect() }
                         }
                     }
                     WebRTCState.FAILED -> {
+                        println("[WhipSession] [iOS] Failed, closed=$closed")
                         if (!closed) {
                             scope.launch { reconnect() }
                         }
@@ -130,6 +137,7 @@ actual class WhipSession actual constructor(
 
     private suspend fun reconnect() {
         if (closed) return
+        println("[WhipSession] [iOS] reconnect() triggered")
         try {
             StreamRetryHandler.withRetry(
                 config = retryConfig,
@@ -144,6 +152,7 @@ actual class WhipSession actual constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            println("[WhipSession] [iOS] reconnect() failed: ${e::class.simpleName}: ${e.message}")
             if (!closed) {
                 _state.value = SessionState.Error(
                     message = e.message ?: "Reconnection failed",

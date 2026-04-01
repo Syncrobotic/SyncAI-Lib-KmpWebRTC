@@ -3,6 +3,7 @@
 package com.syncrobotic.webrtc.session
 
 import android.content.Context
+import android.util.Log
 import com.syncrobotic.webrtc.*
 import com.syncrobotic.webrtc.audio.AudioPushConfig
 import com.syncrobotic.webrtc.config.RetryConfig
@@ -53,6 +54,7 @@ actual class WhipSession actual constructor(
 
     actual suspend fun connect() {
         if (closed) return
+        Log.d(TAG, "connect() called, retryConfig=$retryConfig")
         _state.value = SessionState.Connecting
 
         try {
@@ -68,6 +70,7 @@ actual class WhipSession actual constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            Log.e(TAG, "connect() failed: ${e::class.simpleName}: ${e.message}")
             if (!closed) {
                 _state.value = SessionState.Error(
                     message = e.message ?: "Connection failed",
@@ -83,20 +86,25 @@ actual class WhipSession actual constructor(
             "Android Context not set. Call setContext() before connect()."
         )
 
+        Log.d(TAG, "doConnect() starting...")
         createdDataChannels.clear()
         client.initializeForSending(ctx, audioConfig.webrtcConfig, object : WebRTCListener {
             override fun onConnectionStateChanged(state: WebRTCState) {
+                Log.d(TAG, "WebRTC state: $state")
                 when (state) {
                     WebRTCState.CONNECTED -> {
+                        Log.d(TAG, "Connected successfully")
                         _state.value = SessionState.Connected
                         startStatsCollection()
                     }
                     WebRTCState.DISCONNECTED -> {
+                        Log.d(TAG, "Disconnected, closed=$closed")
                         if (!closed) {
                             scope.launch { reconnect() }
                         }
                     }
                     WebRTCState.FAILED -> {
+                        Log.d(TAG, "Failed, closed=$closed")
                         if (!closed) {
                             scope.launch { reconnect() }
                         }
@@ -143,6 +151,7 @@ actual class WhipSession actual constructor(
 
     private suspend fun reconnect() {
         if (closed) return
+        Log.d(TAG, "reconnect() triggered")
         try {
             StreamRetryHandler.withRetry(
                 config = retryConfig,
@@ -157,6 +166,7 @@ actual class WhipSession actual constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            Log.e(TAG, "reconnect() failed: ${e::class.simpleName}: ${e.message}")
             if (!closed) {
                 _state.value = SessionState.Error(
                     message = e.message ?: "Reconnection failed",
@@ -220,5 +230,9 @@ actual class WhipSession actual constructor(
                 delay(1000)
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "WhipSession"
     }
 }

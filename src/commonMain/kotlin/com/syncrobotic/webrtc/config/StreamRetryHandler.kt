@@ -28,36 +28,51 @@ object StreamRetryHandler {
         onRetryError: (attempt: Int, error: Throwable) -> Unit = { _, _ -> },
         block: suspend (attempt: Int) -> T
     ): T {
-        val maxAttempts = config.maxRetries + 1
+        val isUnlimited = config.maxRetries == Int.MAX_VALUE
+        val maxAttempts = if (isUnlimited) Int.MAX_VALUE else config.maxRetries + 1
         var lastException: Throwable? = null
 
-        for (attempt in 1..maxAttempts) {
+        println("[StreamRetryHandler] [$actionName] Starting with maxRetries=${if (isUnlimited) "unlimited" else config.maxRetries}, initialDelay=${config.initialDelayMs}ms, backoff=${config.backoffFactor}")
+
+        var attempt = 0
+        while (true) {
+            attempt++
+            // Guard: for non-unlimited, stop after maxAttempts
+            if (!isUnlimited && attempt > maxAttempts) break
+
             try {
+                println("[StreamRetryHandler] [$actionName] Attempt #$attempt")
                 return block(attempt)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
                 lastException = e
+                println("[StreamRetryHandler] [$actionName] Attempt #$attempt failed: ${e::class.simpleName}: ${e.message}")
 
                 if (!shouldRetry(e, config)) {
+                    println("[StreamRetryHandler] [$actionName] Error is not retryable, giving up")
                     throw e
                 }
 
-                if (attempt >= maxAttempts) {
+                if (!isUnlimited && attempt >= maxAttempts) {
+                    println("[StreamRetryHandler] [$actionName] All $maxAttempts attempts exhausted")
                     break
                 }
 
                 val delayMs = config.calculateDelay(attempt - 1)
-                onAttempt(attempt, maxAttempts - 1, delayMs)
+                val displayMaxRetries = if (isUnlimited) "unlimited" else "${maxAttempts - 1}"
+                println("[StreamRetryHandler] [$actionName] Retrying in ${delayMs}ms (attempt $attempt/$displayMaxRetries)")
+                onAttempt(attempt, if (isUnlimited) Int.MAX_VALUE else maxAttempts - 1, delayMs)
                 onRetryError(attempt, e)
                 delay(delayMs)
             }
         }
 
+        val retriesDisplay = if (isUnlimited) "unlimited" else "${config.maxRetries}"
         throw StreamRetryExhaustedException(
-            message = "$actionName failed after ${config.maxRetries} retries",
+            message = "$actionName failed after $retriesDisplay retries",
             cause = lastException,
-            totalAttempts = maxAttempts
+            totalAttempts = attempt
         )
     }
 

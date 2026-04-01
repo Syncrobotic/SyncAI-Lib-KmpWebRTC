@@ -48,6 +48,7 @@ actual class WhepSession actual constructor(
 
     actual suspend fun connect() {
         if (closed) return
+        println("[WhepSession] [JVM] connect() called, retryConfig=$retryConfig")
         _state.value = SessionState.Connecting
 
         try {
@@ -63,6 +64,7 @@ actual class WhepSession actual constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            println("[WhepSession] [JVM] connect() failed: ${e::class.simpleName}: ${e.message}")
             if (!closed) {
                 _state.value = SessionState.Error(
                     message = e.message ?: "Connection failed",
@@ -74,20 +76,25 @@ actual class WhepSession actual constructor(
     }
 
     private suspend fun doConnect() {
+        println("[WhepSession] [JVM] doConnect() starting...")
         createdDataChannels.clear()
         client.initialize(config, object : WebRTCListener {
             override fun onConnectionStateChanged(state: WebRTCState) {
+                println("[WhepSession] [JVM] WebRTC state: $state")
                 when (state) {
                     WebRTCState.CONNECTED -> {
+                        println("[WhepSession] [JVM] Connected successfully")
                         _state.value = SessionState.Connected
                         startStatsCollection()
                     }
                     WebRTCState.DISCONNECTED -> {
+                        println("[WhepSession] [JVM] Disconnected, closed=$closed")
                         if (!closed) {
                             scope.launch { reconnect() }
                         }
                     }
                     WebRTCState.FAILED -> {
+                        println("[WhepSession] [JVM] Failed, closed=$closed")
                         if (!closed) {
                             scope.launch { reconnect() }
                         }
@@ -133,6 +140,7 @@ actual class WhepSession actual constructor(
 
     private suspend fun reconnect() {
         if (closed) return
+        println("[WhepSession] [JVM] reconnect() triggered")
         try {
             StreamRetryHandler.withRetry(
                 config = retryConfig,
@@ -147,6 +155,7 @@ actual class WhepSession actual constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            println("[WhepSession] [JVM] reconnect() failed: ${e::class.simpleName}: ${e.message}")
             if (!closed) {
                 _state.value = SessionState.Error(
                     message = e.message ?: "Reconnection failed",
