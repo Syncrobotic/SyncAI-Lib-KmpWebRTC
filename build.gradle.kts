@@ -176,15 +176,6 @@ android {
 
 // GitHub Packages publishing configuration
 publishing {
-    publications {
-        // Filter out platforms we don't want to publish
-        val excludedPublications = setOf("iosSimulatorArm64", "js", "wasmJs")
-        publications.matching { it.name in excludedPublications }.configureEach {
-            tasks.withType<PublishToMavenRepository>().matching {
-                it.publication == this@configureEach
-            }.configureEach { enabled = false }
-        }
-    }
     repositories {
         maven {
             name = "GitHubPackages"
@@ -197,6 +188,17 @@ publishing {
             }
         }
     }
+}
+
+// Filter out platforms we don't want to publish (iosSimulatorArm64, js, wasmJs)
+val excludedPublications = setOf("iosSimulatorArm64", "js", "wasmJs")
+
+tasks.withType<PublishToMavenRepository>().configureEach {
+    onlyIf { publication.name !in excludedPublications }
+}
+
+tasks.withType<PublishToMavenLocal>().configureEach {
+    onlyIf { publication.name !in excludedPublications }
 }
 
 // Auto-configure git hooks path on first build (like Husky for JS)
