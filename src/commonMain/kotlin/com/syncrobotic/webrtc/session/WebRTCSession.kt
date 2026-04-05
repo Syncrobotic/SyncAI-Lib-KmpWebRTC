@@ -88,6 +88,9 @@ expect class WebRTCSession(
     /** Enable/disable incoming audio playback. Only effective when `mediaConfig.receiveAudio = true`. */
     fun setAudioEnabled(enabled: Boolean)
 
+    /** Enable/disable incoming video rendering. Only effective when `mediaConfig.receiveVideo = true`. */
+    fun setRemoteVideoEnabled(enabled: Boolean)
+
     /** Toggle speakerphone output (mobile platforms only). */
     fun setSpeakerphoneEnabled(enabled: Boolean)
 

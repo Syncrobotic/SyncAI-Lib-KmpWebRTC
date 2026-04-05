@@ -298,6 +298,20 @@ actual class WebRTCClient {
         _isVideoEnabled = enabled
     }
 
+    /**
+     * Enable or disable received (remote) video tracks.
+     */
+    fun setRemoteVideoEnabled(enabled: Boolean) {
+        peerConnection?.transceivers?.forEach { transceiver ->
+            if (transceiver.mediaType == org.webrtc.MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO &&
+                transceiver.direction == org.webrtc.RtpTransceiver.RtpTransceiverDirection.RECV_ONLY ||
+                transceiver.direction == org.webrtc.RtpTransceiver.RtpTransceiverDirection.SEND_RECV
+            ) {
+                (transceiver.receiver?.track() as? org.webrtc.VideoTrack)?.setEnabled(enabled)
+            }
+        }
+    }
+
     private fun configureSpeakerphone(context: Context, enabled: Boolean) {
         try {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager

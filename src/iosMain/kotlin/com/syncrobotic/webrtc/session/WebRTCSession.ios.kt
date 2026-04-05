@@ -235,6 +235,10 @@ actual class WebRTCSession actual constructor(
         client.setAudioEnabled(enabled)
     }
 
+    actual fun setRemoteVideoEnabled(enabled: Boolean) {
+        client.setRemoteVideoEnabled(enabled)
+    }
+
     actual fun setSpeakerphoneEnabled(enabled: Boolean) {
         client.setSpeakerphoneEnabled(enabled)
     }

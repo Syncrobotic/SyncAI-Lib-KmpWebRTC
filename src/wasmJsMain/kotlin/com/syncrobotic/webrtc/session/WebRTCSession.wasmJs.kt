@@ -37,6 +37,7 @@ actual class WebRTCSession actual constructor(
 
     actual fun createDataChannel(config: DataChannelConfig): DataChannel? = null
     actual fun setAudioEnabled(enabled: Boolean) {}
+    actual fun setRemoteVideoEnabled(enabled: Boolean) {}
     actual fun setSpeakerphoneEnabled(enabled: Boolean) {}
     actual fun setMuted(muted: Boolean) {}
     actual fun toggleMute() {}
