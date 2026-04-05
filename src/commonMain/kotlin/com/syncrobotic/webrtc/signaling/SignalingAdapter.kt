@@ -10,8 +10,9 @@ import io.ktor.client.plugins.cookies.*
  * while Session classes consume this interface to manage PeerConnection lifecycle.
  *
  * Built-in adapters:
- * - [WhepSignalingAdapter] — WHEP HTTP signaling for receiving streams
- * - [WhipSignalingAdapter] — WHIP HTTP signaling for sending streams
+ * - [HttpSignalingAdapter] — Unified HTTP signaling (WHEP/WHIP/custom endpoints)
+ * - [WhepSignalingAdapter] — WHEP HTTP signaling for receiving streams (deprecated, use [HttpSignalingAdapter])
+ * - [WhipSignalingAdapter] — WHIP HTTP signaling for sending streams (deprecated, use [HttpSignalingAdapter])
  *
  * Custom adapters can implement this interface for proprietary signaling servers.
  */

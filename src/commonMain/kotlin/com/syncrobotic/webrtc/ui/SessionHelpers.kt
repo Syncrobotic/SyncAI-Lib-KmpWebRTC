@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WebRTCSession
 import com.syncrobotic.webrtc.session.WhepSession
 
 /**
@@ -58,6 +59,22 @@ internal class SessionVideoPlayerController(
         // Not supported for live WebRTC streams
     }
 
+    override val currentPosition: Long get() = 0L
+    override val duration: Long get() = 0L
+    override val isPlaying: Boolean
+        get() = session.state.value == SessionState.Connected
+}
+
+/**
+ * A [VideoPlayerController] backed by a [WebRTCSession].
+ */
+internal class WebRTCSessionVideoPlayerController(
+    private val session: WebRTCSession
+) : VideoPlayerController {
+    override fun play() { session.setAudioEnabled(true) }
+    override fun pause() { session.setAudioEnabled(false) }
+    override fun stop() { session.close() }
+    override fun seekTo(positionMs: Long) {}
     override val currentPosition: Long get() = 0L
     override val duration: Long get() = 0L
     override val isPlaying: Boolean

@@ -3,6 +3,7 @@ package com.syncrobotic.webrtc.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.syncrobotic.webrtc.config.StreamConfig
+import com.syncrobotic.webrtc.session.WebRTCSession
 import com.syncrobotic.webrtc.session.WhepSession
 
 /**
@@ -32,6 +33,27 @@ import com.syncrobotic.webrtc.session.WhepSession
 @Composable
 expect fun VideoRenderer(
     session: WhepSession,
+    modifier: Modifier = Modifier,
+    onStateChange: ((PlayerState) -> Unit)? = null,
+    onEvent: ((PlayerEvent) -> Unit)? = null,
+): VideoPlayerController
+
+/**
+ * A cross-platform video renderer driven by a [WebRTCSession].
+ *
+ * Requires `mediaConfig.receiveVideo = true` in the session's [MediaConfig].
+ *
+ * ```kotlin
+ * val session = WebRTCSession(
+ *     signaling = HttpSignalingAdapter("https://server/stream/whep"),
+ *     mediaConfig = MediaConfig.RECEIVE_VIDEO
+ * )
+ * VideoRenderer(session = session, modifier = Modifier.fillMaxSize())
+ * ```
+ */
+@Composable
+expect fun VideoRenderer(
+    session: WebRTCSession,
     modifier: Modifier = Modifier,
     onStateChange: ((PlayerState) -> Unit)? = null,
     onEvent: ((PlayerEvent) -> Unit)? = null,

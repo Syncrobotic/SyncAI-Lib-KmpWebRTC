@@ -253,6 +253,12 @@ actual class WebRTCClient {
         return offer.sdp.toString()
     }
 
+    actual suspend fun createFlexibleOffer(
+        mediaConfig: com.syncrobotic.webrtc.config.MediaConfig
+    ): String {
+        TODO("createFlexibleOffer not yet implemented for this platform")
+    }
+
     actual fun setAudioEnabled(enabled: Boolean) {
         _isAudioEnabled = enabled
     }

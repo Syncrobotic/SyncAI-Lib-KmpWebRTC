@@ -19,6 +19,7 @@ import com.syncrobotic.webrtc.VideoFrame
 import com.syncrobotic.webrtc.config.StreamConfig
 import com.syncrobotic.webrtc.config.StreamProtocol
 import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WebRTCSession
 import com.syncrobotic.webrtc.session.WhepSession
 import dev.onvoid.webrtc.media.video.VideoFrame as NativeVideoFrame
 import kotlinx.coroutines.*
@@ -136,6 +137,92 @@ actual fun VideoRenderer(
     }
 
     return remember(session) { SessionVideoPlayerController(session) }
+}
+
+/**
+ * JVM/Desktop implementation of VideoRenderer backed by [WebRTCSession].
+ */
+@Composable
+actual fun VideoRenderer(
+    session: WebRTCSession,
+    modifier: Modifier,
+    onStateChange: ((PlayerState) -> Unit)?,
+    onEvent: ((PlayerEvent) -> Unit)?,
+): VideoPlayerController {
+    var currentFrame by remember { mutableStateOf<ImageBitmap?>(null) }
+    val sessionState by session.state.collectAsState()
+    val connectionStartTime = remember { System.currentTimeMillis() }
+    var hasReportedFirstFrame by remember { mutableStateOf(false) }
+    var lastReportedWidth by remember { mutableStateOf(0) }
+    var lastReportedHeight by remember { mutableStateOf(0) }
+
+    val frameFlow = remember { MutableSharedFlow<ImageBitmap>(replay = 1) }
+
+    LaunchedEffect(frameFlow) {
+        frameFlow.collect { bitmap -> currentFrame = bitmap }
+    }
+
+    LaunchedEffect(session) {
+        session.onClientReady = { client ->
+            hasReportedFirstFrame = false
+            currentFrame = null
+
+            client.setVideoSink(object : dev.onvoid.webrtc.media.video.VideoTrackSink {
+                override fun onVideoFrame(frame: NativeVideoFrame) {
+                    val bitmap = convertVideoFrameToImageBitmap(frame)
+                    if (bitmap != null) frameFlow.tryEmit(bitmap)
+                    if (!hasReportedFirstFrame) {
+                        hasReportedFirstFrame = true
+                        val elapsed = System.currentTimeMillis() - connectionStartTime
+                        onEvent?.invoke(PlayerEvent.FirstFrameRendered(elapsed))
+                    }
+                    val w = frame.buffer.width
+                    val h = frame.buffer.height
+                    if (w > 0 && h > 0 && (w != lastReportedWidth || h != lastReportedHeight)) {
+                        lastReportedWidth = w
+                        lastReportedHeight = h
+                        onEvent?.invoke(PlayerEvent.StreamInfoReceived(
+                            StreamInfo(width = w, height = h, protocol = "WebRTC", codec = "VP8/H264", fps = client.getCurrentFps())
+                        ))
+                    }
+                }
+            })
+        }
+        if (session.state.value == SessionState.Idle || session.state.value is SessionState.Error) {
+            session.connect()
+        }
+    }
+
+    LaunchedEffect(sessionState) {
+        onStateChange?.invoke(sessionState.toPlayerState())
+    }
+
+    val frame = currentFrame
+    Box(modifier = modifier.fillMaxSize()) {
+        if (frame != null) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawImage(
+                    image = frame,
+                    srcOffset = IntOffset.Zero,
+                    srcSize = IntSize(frame.width, frame.height),
+                    dstOffset = IntOffset.Zero,
+                    dstSize = IntSize(size.width.toInt(), size.height.toInt())
+                )
+            }
+            SessionStatusOverlay(sessionState)
+        } else {
+            SessionVideoPlaceholder(sessionState, Modifier)
+        }
+    }
+
+    DisposableEffect(session) {
+        onDispose {
+            session.onClientReady = null
+            session.client.setVideoSink(null)
+        }
+    }
+
+    return remember(session) { WebRTCSessionVideoPlayerController(session) }
 }
 
 /**

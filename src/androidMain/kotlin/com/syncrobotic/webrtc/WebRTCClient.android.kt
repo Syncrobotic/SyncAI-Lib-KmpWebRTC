@@ -450,7 +450,78 @@ actual class WebRTCClient {
             override fun onSetFailure(error: String?) {}
         }, constraints)
     }
-    
+
+    actual suspend fun createFlexibleOffer(
+        mediaConfig: com.syncrobotic.webrtc.config.MediaConfig
+    ): String = suspendCancellableCoroutine { cont ->
+        val pc = peerConnection ?: run {
+            cont.resumeWithException(Exception("PeerConnection not initialized"))
+            return@suspendCancellableCoroutine
+        }
+
+        try {
+            // Video transceiver
+            mediaConfig.videoDirection?.let { dir ->
+                val nativeDir = when (dir) {
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_ONLY -> RtpTransceiver.RtpTransceiverDirection.SEND_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY -> RtpTransceiver.RtpTransceiverDirection.RECV_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV -> RtpTransceiver.RtpTransceiverDirection.SEND_RECV
+                }
+                pc.addTransceiver(
+                    MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
+                    RtpTransceiver.RtpTransceiverInit(nativeDir)
+                )
+            }
+
+            // Audio transceiver
+            mediaConfig.audioDirection?.let { dir ->
+                val nativeDir = when (dir) {
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_ONLY -> RtpTransceiver.RtpTransceiverDirection.SEND_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY -> RtpTransceiver.RtpTransceiverDirection.RECV_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV -> RtpTransceiver.RtpTransceiverDirection.SEND_RECV
+                }
+                if (dir.isSending && localAudioTrack != null) {
+                    // Use the real local audio track for sending
+                    pc.addTransceiver(
+                        localAudioTrack,
+                        RtpTransceiver.RtpTransceiverInit(nativeDir)
+                    )
+                } else {
+                    pc.addTransceiver(
+                        MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO,
+                        RtpTransceiver.RtpTransceiverInit(nativeDir)
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            cont.resumeWithException(Exception("Failed to setup transceivers: ${e.message}"))
+            return@suspendCancellableCoroutine
+        }
+
+        val constraints = MediaConstraints()
+        pc.createOffer(object : SdpObserver {
+            override fun onCreateSuccess(sdp: SessionDescription) {
+                pc.setLocalDescription(object : SdpObserver {
+                    override fun onCreateSuccess(sdp: SessionDescription?) {}
+                    override fun onSetSuccess() {
+                        cont.resume(sdp.description)
+                    }
+                    override fun onCreateFailure(error: String?) {
+                        cont.resumeWithException(Exception("Failed to set local description: $error"))
+                    }
+                    override fun onSetFailure(error: String?) {
+                        cont.resumeWithException(Exception("Failed to set local description: $error"))
+                    }
+                }, sdp)
+            }
+            override fun onSetSuccess() {}
+            override fun onCreateFailure(error: String?) {
+                cont.resumeWithException(Exception("Failed to create offer: $error"))
+            }
+            override fun onSetFailure(error: String?) {}
+        }, constraints)
+    }
+
     actual fun setAudioEnabled(enabled: Boolean) {
         localAudioTrack?.setEnabled(enabled)
         _isAudioEnabled = enabled

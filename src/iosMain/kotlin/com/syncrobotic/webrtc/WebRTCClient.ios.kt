@@ -481,6 +481,95 @@ actual class WebRTCClient {
         }
     }
     
+    actual suspend fun createFlexibleOffer(
+        mediaConfig: com.syncrobotic.webrtc.config.MediaConfig
+    ): String = suspendCancellableCoroutine { cont ->
+        val pc = peerConnection
+        if (pc == null) {
+            cont.resumeWithException(Exception("PeerConnection not initialized"))
+            return@suspendCancellableCoroutine
+        }
+
+        try {
+            // Video transceiver
+            mediaConfig.videoDirection?.let { dir ->
+                val nativeDir = when (dir) {
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_ONLY ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionSendOnly
+                    com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionRecvOnly
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionSendRecv
+                }
+                if (dir.isSending && videoTrack != null) {
+                    pc.addTrack(videoTrack!!, streamIds = listOf("local-video-stream"))
+                    // Update transceiver direction
+                    pc.transceivers.filterIsInstance<RTCRtpTransceiver>()
+                        .lastOrNull { it.mediaType == RTCRtpMediaType.RTCRtpMediaTypeVideo }
+                        ?.setDirection(nativeDir, error = null)
+                } else {
+                    pc.addTransceiverOfType(
+                        RTCRtpMediaType.RTCRtpMediaTypeVideo,
+                        init = RTCRtpTransceiverInit().apply {
+                            direction = nativeDir
+                        }
+                    )
+                }
+            }
+
+            // Audio transceiver
+            mediaConfig.audioDirection?.let { dir ->
+                val nativeDir = when (dir) {
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_ONLY ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionSendOnly
+                    com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionRecvOnly
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionSendRecv
+                }
+                if (dir.isSending && localAudioTrack != null) {
+                    pc.addTrack(localAudioTrack!!, streamIds = listOf("local-audio-stream"))
+                    // Update transceiver direction
+                    pc.transceivers.filterIsInstance<RTCRtpTransceiver>()
+                        .lastOrNull { it.mediaType == RTCRtpMediaType.RTCRtpMediaTypeAudio }
+                        ?.setDirection(nativeDir, error = null)
+                } else {
+                    pc.addTransceiverOfType(
+                        RTCRtpMediaType.RTCRtpMediaTypeAudio,
+                        init = RTCRtpTransceiverInit().apply {
+                            direction = nativeDir
+                        }
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            cont.resumeWithException(Exception("Failed to setup transceivers: ${e.message}"))
+            return@suspendCancellableCoroutine
+        }
+
+        val constraints = RTCMediaConstraints(
+            mandatoryConstraints = null,
+            optionalConstraints = null
+        )
+
+        pc.offerForConstraints(constraints) { sdp, error ->
+            if (error != null) {
+                cont.resumeWithException(Exception("Failed to create flexible offer: ${error.localizedDescription}"))
+                return@offerForConstraints
+            }
+
+            sdp?.let { sessionDescription ->
+                pc.setLocalDescription(sessionDescription) { setError ->
+                    if (setError != null) {
+                        cont.resumeWithException(Exception("Failed to set local description: ${setError.localizedDescription}"))
+                    } else {
+                        cont.resume(sessionDescription.sdp)
+                    }
+                }
+            } ?: cont.resumeWithException(Exception("SDP is null"))
+        }
+    }
+
     actual fun setAudioEnabled(enabled: Boolean) {
         localAudioTrack?.isEnabled = enabled
         _isAudioEnabled = enabled

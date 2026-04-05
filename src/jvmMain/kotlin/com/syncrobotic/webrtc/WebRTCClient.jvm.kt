@@ -25,6 +25,7 @@ actual class WebRTCClient {
     
     private var localAudioSource: dev.onvoid.webrtc.media.audio.AudioTrackSource? = null
     private var localAudioTrack: dev.onvoid.webrtc.media.audio.AudioTrack? = null
+    private var localVideoTrack: VideoTrack? = null
     private var _isAudioEnabled = true
     
     // Protection flag to prevent double-close and close during native callback
@@ -368,6 +369,87 @@ actual class WebRTCClient {
         })
     }
     
+    actual suspend fun createFlexibleOffer(
+        mediaConfig: com.syncrobotic.webrtc.config.MediaConfig
+    ): String = suspendCancellableCoroutine { cont ->
+        val factory = peerConnectionFactory
+        val pc = peerConnection
+
+        if (factory == null || pc == null) {
+            cont.resumeWithException(Exception("PeerConnection not initialized"))
+            return@suspendCancellableCoroutine
+        }
+
+        try {
+            // Video transceiver
+            mediaConfig.videoDirection?.let { dir ->
+                val nativeDir = when (dir) {
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_ONLY -> RTCRtpTransceiverDirection.SEND_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY -> RTCRtpTransceiverDirection.RECV_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV -> RTCRtpTransceiverDirection.SEND_RECV
+                }
+                val track = if (dir.isSending && localVideoTrack != null) {
+                    localVideoTrack
+                } else {
+                    if (dummyVideoTrack == null) {
+                        dummyVideoSource = CustomVideoSource()
+                        dummyVideoTrack = factory.createVideoTrack("dummy-video", dummyVideoSource)
+                    }
+                    dummyVideoTrack
+                }
+                val init = RTCRtpTransceiverInit().apply { direction = nativeDir }
+                pc.addTransceiver(track, init)
+            }
+
+            // Audio transceiver
+            mediaConfig.audioDirection?.let { dir ->
+                val nativeDir = when (dir) {
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_ONLY -> RTCRtpTransceiverDirection.SEND_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY -> RTCRtpTransceiverDirection.RECV_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV -> RTCRtpTransceiverDirection.SEND_RECV
+                }
+                // If localAudioTrack was already added via addTrack() in initializeForSending(),
+                // find the existing transceiver and update its direction instead of adding a new one.
+                if (dir.isSending && localAudioTrack != null) {
+                    // Track already added by initializeForSending() via addTrack().
+                    // Find its transceiver and set the desired direction.
+                    val transceivers = pc.transceivers
+                    transceivers?.lastOrNull()?.let { it.direction = nativeDir }
+                } else {
+                    if (dummyAudioTrack == null) {
+                        dummyAudioSource = factory.createAudioSource(dev.onvoid.webrtc.media.audio.AudioOptions())
+                        dummyAudioTrack = factory.createAudioTrack("dummy-audio", dummyAudioSource)
+                    }
+                    val init = RTCRtpTransceiverInit().apply { direction = nativeDir }
+                    pc.addTransceiver(dummyAudioTrack, init)
+                }
+            }
+        } catch (e: Exception) {
+            cont.resumeWithException(Exception("Failed to setup transceivers: ${e.message}"))
+            return@suspendCancellableCoroutine
+        }
+
+        val options = RTCOfferOptions()
+
+        peerConnection?.createOffer(options, object : CreateSessionDescriptionObserver {
+            override fun onSuccess(description: RTCSessionDescription) {
+                peerConnection?.setLocalDescription(description, object : SetSessionDescriptionObserver {
+                    override fun onSuccess() {
+                        cont.resume(description.sdp)
+                    }
+
+                    override fun onFailure(error: String) {
+                        cont.resumeWithException(Exception("Failed to set local description: $error"))
+                    }
+                })
+            }
+
+            override fun onFailure(error: String) {
+                cont.resumeWithException(Exception("Failed to create offer: $error"))
+            }
+        })
+    }
+
     actual fun setAudioEnabled(enabled: Boolean) {
         localAudioTrack?.setEnabled(enabled)
         _isAudioEnabled = enabled

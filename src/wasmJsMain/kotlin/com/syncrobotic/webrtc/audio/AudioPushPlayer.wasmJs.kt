@@ -5,6 +5,7 @@ package com.syncrobotic.webrtc.audio
 import androidx.compose.runtime.*
 import com.syncrobotic.webrtc.*
 import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WebRTCSession
 import com.syncrobotic.webrtc.session.WhipSession
 import com.syncrobotic.webrtc.signaling.WhipSignaling
 import io.ktor.client.*
@@ -35,6 +36,19 @@ actual fun AudioPushPlayer(
     }
 
     return remember(session) { SessionAudioPushController(session, scope) }
+}
+
+/**
+ * WasmJS implementation of session-based AudioPushPlayer for [WebRTCSession].
+ * Stub — full browser support not yet implemented.
+ */
+@Composable
+actual fun AudioPushPlayer(
+    session: WebRTCSession,
+    autoStart: Boolean,
+    onStateChange: ((AudioPushState) -> Unit)?,
+): AudioPushController {
+    TODO("WebRTCSession AudioPushPlayer not yet implemented for this platform")
 }
 
 /**

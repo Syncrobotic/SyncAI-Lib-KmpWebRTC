@@ -295,6 +295,17 @@ expect class WebRTCClient {
     fun createDataChannel(config: com.syncrobotic.webrtc.datachannel.DataChannelConfig): com.syncrobotic.webrtc.datachannel.DataChannel?
 
     /**
+     * Create an SDP offer with flexible per-media direction control.
+     *
+     * Unlike [createOffer] (receive-only) and [createSendOffer] (send-only), this method
+     * supports all direction combinations including `SEND_RECV` for bidirectional media.
+     *
+     * @param mediaConfig Configuration specifying which media to send/receive
+     * @return Local SDP offer string
+     */
+    suspend fun createFlexibleOffer(mediaConfig: com.syncrobotic.webrtc.config.MediaConfig): String
+
+    /**
      * Get WebRTC connection statistics.
      */
     suspend fun getStats(): WebRTCStats?

@@ -5,6 +5,7 @@ package com.syncrobotic.webrtc.audio
 import androidx.compose.runtime.*
 import com.syncrobotic.webrtc.*
 import com.syncrobotic.webrtc.session.SessionState
+import com.syncrobotic.webrtc.session.WebRTCSession
 import com.syncrobotic.webrtc.session.WhipSession
 import com.syncrobotic.webrtc.signaling.WhipSignaling
 import io.ktor.client.*
@@ -39,6 +40,35 @@ actual fun AudioPushPlayer(
     }
 
     return remember(session) { SessionAudioPushController(session, scope) }
+}
+
+/**
+ * JVM implementation of AudioPushPlayer backed by [WebRTCSession].
+ */
+@Composable
+actual fun AudioPushPlayer(
+    session: WebRTCSession,
+    autoStart: Boolean,
+    onStateChange: ((AudioPushState) -> Unit)?,
+): AudioPushController {
+    val scope = rememberCoroutineScope()
+    val sessionState by session.state.collectAsState()
+
+    LaunchedEffect(session, autoStart) {
+        if (autoStart && (session.state.value == SessionState.Idle || session.state.value is SessionState.Error)) {
+            session.connect()
+        }
+    }
+
+    LaunchedEffect(sessionState) {
+        onStateChange?.invoke(sessionState.toAudioPushState())
+    }
+
+    DisposableEffect(session) {
+        onDispose { /* Session lifecycle managed by user */ }
+    }
+
+    return remember(session) { WebRTCSessionAudioPushController(session, scope) }
 }
 
 /**
