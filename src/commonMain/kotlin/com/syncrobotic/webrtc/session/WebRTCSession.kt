@@ -105,6 +105,46 @@ expect class WebRTCSession(
     /** Switch between front and rear camera. Only effective when `mediaConfig.sendVideo = true`. */
     fun switchCamera()
 
+    // ── Low-level access for custom implementations ─────────────────
+
+    /**
+     * Callback invoked when a remote video frame is received.
+     *
+     * The `frame` parameter is a platform-specific video frame object:
+     * - JVM: `dev.onvoid.webrtc.media.video.VideoFrame`
+     * - Android: `org.webrtc.VideoFrame`
+     * - iOS: `RTCVideoFrame`
+     *
+     * Set this **before** calling [connect] to receive all frames.
+     * Use this to build a fully custom video renderer without relying on [VideoRenderer].
+     *
+     * ```kotlin
+     * session.onRemoteVideoFrame = { frame ->
+     *     // Convert frame to your rendering pipeline
+     * }
+     * ```
+     */
+    var onRemoteVideoFrame: ((frame: Any) -> Unit)?
+
+    /**
+     * Callback invoked when the local camera video track becomes available.
+     *
+     * The `track` parameter is a platform-specific video track object:
+     * - JVM: `dev.onvoid.webrtc.media.video.VideoTrack`
+     * - Android: `org.webrtc.VideoTrack`
+     * - iOS: `RTCVideoTrack`
+     *
+     * Set this **before** calling [connect] to be notified when the camera starts.
+     * Use this to build a fully custom camera preview without relying on [CameraPreview].
+     *
+     * ```kotlin
+     * session.onLocalVideoTrack = { track ->
+     *     // Add your own sink/renderer to the track
+     * }
+     * ```
+     */
+    var onLocalVideoTrack: ((track: Any) -> Unit)?
+
     // ── Lifecycle ─────────────────────────────────────────────────────
 
     /** Close the connection and release all resources. */

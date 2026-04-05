@@ -41,6 +41,10 @@ actual class WebRTCSession actual constructor(
      */
     internal var onClientReady: ((WebRTCClient) -> Unit)? = null
 
+    // ── Public callbacks for custom implementations ───────────────────
+    actual var onRemoteVideoFrame: ((frame: Any) -> Unit)? = null
+    actual var onLocalVideoTrack: ((track: Any) -> Unit)? = null
+
     private var statsJob: Job? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -101,9 +105,22 @@ actual class WebRTCSession actual constructor(
             })
         }
 
+        // Set up remote video frame forwarding if callback is set
+        onRemoteVideoFrame?.let { callback ->
+            client.setVideoSink(object : dev.onvoid.webrtc.media.video.VideoTrackSink {
+                override fun onVideoFrame(frame: dev.onvoid.webrtc.media.video.VideoFrame) {
+                    callback(frame)
+                }
+            })
+        }
+
         // Initialize camera capture if sendVideo is enabled
         if (mediaConfig.sendVideo) {
             client.initializeCameraCapture(mediaConfig.videoConfig)
+            // Notify local video track is ready
+            client.getLocalVideoTrack()?.let { track ->
+                onLocalVideoTrack?.invoke(track)
+            }
         }
 
         onClientReady?.invoke(client)

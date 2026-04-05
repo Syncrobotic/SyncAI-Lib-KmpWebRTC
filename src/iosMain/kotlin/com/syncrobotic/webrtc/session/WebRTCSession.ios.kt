@@ -1,4 +1,5 @@
 @file:Suppress("DEPRECATION")
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 
 package com.syncrobotic.webrtc.session
 
@@ -41,6 +42,10 @@ actual class WebRTCSession actual constructor(
      * Used by VideoRenderer to set up video sink, and CameraPreview for local video.
      */
     internal var onClientReady: ((WebRTCClient) -> Unit)? = null
+
+    // ── Public callbacks for custom implementations ───────────────────
+    actual var onRemoteVideoFrame: ((frame: Any) -> Unit)? = null
+    actual var onLocalVideoTrack: ((track: Any) -> Unit)? = null
 
     private var statsJob: Job? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -93,6 +98,9 @@ actual class WebRTCSession actual constructor(
                 override fun onIceCandidate(candidate: String, sdpMid: String?, sdpMLineIndex: Int) {
                     handleIceCandidate(candidate, sdpMid, sdpMLineIndex)
                 }
+                override fun onVideoFrame(frame: VideoFrame) {
+                    onRemoteVideoFrame?.invoke(frame)
+                }
             })
         } else {
             client.initialize(webrtcConfig, object : WebRTCListener {
@@ -102,12 +110,19 @@ actual class WebRTCSession actual constructor(
                 override fun onIceCandidate(candidate: String, sdpMid: String?, sdpMLineIndex: Int) {
                     handleIceCandidate(candidate, sdpMid, sdpMLineIndex)
                 }
+                override fun onVideoFrame(frame: VideoFrame) {
+                    onRemoteVideoFrame?.invoke(frame)
+                }
             })
         }
 
         // Initialize camera capture if sendVideo is enabled
         if (mediaConfig.sendVideo) {
             client.initializeCameraCapture(mediaConfig.videoConfig)
+            // Notify local video track is ready
+            client.getLocalVideoTrack()?.let { track ->
+                onLocalVideoTrack?.invoke(track)
+            }
         }
 
         onClientReady?.invoke(client)

@@ -27,6 +27,10 @@ actual class WebRTCSession actual constructor(
     private val _stats = MutableStateFlow<WebRTCStats?>(null)
     actual val stats: StateFlow<WebRTCStats?> = _stats.asStateFlow()
 
+    // ── Public callbacks for custom implementations ───────────────────
+    actual var onRemoteVideoFrame: ((frame: Any) -> Unit)? = null
+    actual var onLocalVideoTrack: ((track: Any) -> Unit)? = null
+
     actual suspend fun connect() {
         TODO("WebRTCSession not yet implemented for JS platform")
     }

@@ -44,6 +44,10 @@ actual class WebRTCSession actual constructor(
      */
     internal var onClientReady: ((WebRTCClient, Context) -> Unit)? = null
 
+    // ── Public callbacks for custom implementations ───────────────────
+    actual var onRemoteVideoFrame: ((frame: Any) -> Unit)? = null
+    actual var onLocalVideoTrack: ((track: Any) -> Unit)? = null
+
     private var statsJob: Job? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -108,6 +112,11 @@ actual class WebRTCSession actual constructor(
                 override fun onIceCandidate(candidate: String, sdpMid: String?, sdpMLineIndex: Int) {
                     handleIceCandidate(candidate, sdpMid, sdpMLineIndex)
                 }
+                override fun onVideoFrame(frame: VideoFrame) {
+                    frame.nativeFrame?.let { nativeFrame ->
+                        onRemoteVideoFrame?.invoke(nativeFrame)
+                    }
+                }
             })
         } else {
             client.initializeWithContext(ctx, webrtcConfig, object : WebRTCListener {
@@ -117,12 +126,21 @@ actual class WebRTCSession actual constructor(
                 override fun onIceCandidate(candidate: String, sdpMid: String?, sdpMLineIndex: Int) {
                     handleIceCandidate(candidate, sdpMid, sdpMLineIndex)
                 }
+                override fun onVideoFrame(frame: VideoFrame) {
+                    frame.nativeFrame?.let { nativeFrame ->
+                        onRemoteVideoFrame?.invoke(nativeFrame)
+                    }
+                }
             })
         }
 
         // Initialize camera capture if sendVideo is enabled
         if (mediaConfig.sendVideo) {
             client.initializeCameraCapture(ctx, mediaConfig.videoConfig)
+            // Notify local video track is ready
+            client.getLocalVideoTrack()?.let { track ->
+                onLocalVideoTrack?.invoke(track)
+            }
         }
 
         onClientReady?.invoke(client, ctx)
