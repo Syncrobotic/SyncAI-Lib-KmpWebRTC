@@ -4,7 +4,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/Syncrobotic/SyncAI-Lib-KmpWebRTC/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/Syncrobotic/SyncAI-Lib-KmpWebRTC?style=flat-square)](LICENSE)
 
-Kotlin Multiplatform WebRTC SDK for IoT/robotics control scenarios — low-latency video/audio streaming, bidirectional DataChannel communication, and custom signaling support with zero WebRTC boilerplate.
+Kotlin Multiplatform WebRTC SDK — highly customizable, HTTP-based signaling with flexible media direction control. Supports any combination of sending/receiving video and audio through a single unified session, with zero WebRTC boilerplate.
 
 ## Table of Contents
 
@@ -12,19 +12,20 @@ Kotlin Multiplatform WebRTC SDK for IoT/robotics control scenarios — low-laten
 - [Supported Platforms](#supported-platforms)
 - [Features](#features)
 - [Installation](#installation)
-- [Quick Start](#quick-start)
-  - [Receive Video (WHEP)](#1-receive-video-whep)
-  - [Send Audio (WHIP)](#2-send-audio-whip)
-  - [DataChannel Communication](#3-datachannel-communication)
-  - [Authentication (JWT, Cookie, API Key)](#4-authentication)
-  - [Custom Signaling Adapter](#5-custom-signaling-adapter)
+- [Quick Start (New Unified API)](#quick-start-new-unified-api)
+  - [Receive Video](#1-receive-video)
+  - [Send Camera + Audio](#2-send-camera--audio)
+  - [Bidirectional Audio (Intercom)](#3-bidirectional-audio-intercom)
+  - [Full Video Call](#4-full-video-call)
+  - [DataChannel Communication](#5-datachannel-communication)
+  - [Authentication (JWT, Cookie, API Key)](#6-authentication)
+  - [Custom Signaling Adapter](#7-custom-signaling-adapter)
 - [Customization & Limitations](#customization--limitations)
 - [API Reference](#api-reference)
-  - [SignalingAdapter](#signalingadapter)
-  - [WhepSession](#whepsession)
-  - [WhipSession](#whipsession)
-  - [VideoRenderer](#videorenderer)
-  - [AudioPushPlayer](#audiopushplayer)
+  - [WebRTCSession](#webrtcsession)
+  - [HttpSignalingAdapter](#httpsignalingadapter)
+  - [MediaConfig](#mediaconfig)
+  - [Composables](#composables)
   - [DataChannel](#datachannel)
   - [Configuration](#configuration)
   - [States & Events](#states--events)
@@ -38,7 +39,9 @@ Kotlin Multiplatform WebRTC SDK for IoT/robotics control scenarios — low-laten
 - [Platform Guides](#platform-guides)
 - [Lifecycle & Connection Management](#lifecycle--connection-management)
 - [Architecture Notes](#architecture-notes)
-- [Migration from v1.x](#migration-from-v1x)
+- [Migration Guide](#migration-guide)
+  - [From WhepSession/WhipSession to WebRTCSession](#from-whepsessionwhipsession-to-webrtcsession)
+  - [From v1.x](#from-v1x)
 - [FAQ](#faq)
 - [Build & Publish](#build--publish)
 
@@ -50,17 +53,20 @@ The SDK is organized into three layers. Application code interacts with **Layer 
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Layer 3: Composables (UI Convenience)                       │
-│  VideoRenderer(session) → VideoPlayerController              │
-│  AudioPushPlayer(session) → AudioPushController              │
+│  Layer 3: Composables (UI)                                   │
+│  VideoRenderer(session)    — display remote video            │
+│  CameraPreview(session)    — display local camera            │
+│  AudioPushPlayer(session)  — microphone send controls        │
+│  AudioPlayer(session)      — remote audio playback controls  │
 ├──────────────────────────────────────────────────────────────┤
 │  Layer 2: Session API (Core Public API)                      │
-│  WhepSession  → connect / DataChannel / stats / close        │
-│  WhipSession  → connect / DataChannel / mute / stats / close │
+│  WebRTCSession(signaling, mediaConfig)                       │
+│    → connect / close / mute / switchCamera / DataChannel     │
+│    → state: StateFlow<SessionState>                          │
+│    → stats: StateFlow<WebRTCStats?>                          │
 ├──────────────────────────────────────────────────────────────┤
 │  Layer 1: Signaling Adapter                                  │
-│  WhepSignalingAdapter(url, headers, httpClient?)             │
-│  WhipSignalingAdapter(url, headers, httpClient?)             │
+│  HttpSignalingAdapter(url, auth, httpClient?)                │
 │  Custom: implement SignalingAdapter interface                │
 ├──────────────────────────────────────────────────────────────┤
 │  Internal: WebRTCClient, PeerConnectionFactory, ICE, SDP     │
@@ -68,11 +74,13 @@ The SDK is organized into three layers. Application code interacts with **Layer 
 └──────────────────────────────────────────────────────────────┘
 ```
 
+**Key concept**: `WebRTCSession` is the single entry point. Media directions (send/receive video/audio) are configured via `MediaConfig` — the same session class handles all scenarios from receive-only to full video calls.
+
 | Layer | Role | When to Use |
 |-------|------|-------------|
-| **SignalingAdapter** | Handles SDP offer/answer exchange over HTTP | Always needed — choose built-in (WHEP/WHIP) or implement your own |
-| **Session** | Manages full WebRTC PeerConnection lifecycle, DataChannel, auto-reconnect, stats | Primary entry point for all connection logic |
-| **Composables** | Renders video / captures audio within Compose Multiplatform UI | When using Compose for UI (Android/iOS/Desktop) |
+| **SignalingAdapter** | Handles SDP offer/answer exchange over HTTP | Always needed — use `HttpSignalingAdapter` or implement your own |
+| **WebRTCSession** | Manages full PeerConnection lifecycle, media capture, DataChannel, auto-reconnect, stats | Primary entry point for all connection logic |
+| **Composables** | Renders video / camera preview / audio controls within Compose UI | When using Compose for UI (Android/iOS/Desktop) |
 
 ---
 
@@ -100,19 +108,21 @@ The SDK is organized into three layers. Application code interacts with **Layer 
 
 | Feature | Description |
 |---------|-------------|
-| **WHEP Video/Audio Receive** | Receive streams via standard WHEP protocol |
-| **WHIP Audio Send** | Send microphone audio via standard WHIP protocol |
+| **Unified WebRTCSession** | Single session for any media direction — receive, send, or bidirectional |
+| **Flexible MediaConfig** | Configure `receiveVideo`, `receiveAudio`, `sendVideo`, `sendAudio` independently |
+| **Camera Capture** | Cross-platform camera support (Android Camera2, iOS AVFoundation, JVM webrtc-java) |
+| **Video Receive** | Receive streams via any HTTP-based signaling (WHEP, custom) |
+| **Audio Send/Receive** | Microphone capture + remote audio playback in same or separate sessions |
 | **DataChannel** | Bidirectional text/JSON and binary (images, files) messaging |
 | **Custom Signaling** | Pluggable `SignalingAdapter` — implement any signaling protocol |
 | **Built-in Auth** | JWT Bearer, Cookie (app-managed), API key, custom headers |
 | **Auto Reconnect** | Configurable exponential backoff with jitter |
 | **Real-time Stats** | RTT, packet loss, bitrate, codec via `StateFlow<WebRTCStats?>` |
-| **Compose UI** | Cross-platform `VideoRenderer` and `AudioPushPlayer` composables |
-| **Session API** | High-level `WhepSession`/`WhipSession` — no SDP/ICE knowledge required |
+| **Compose UI** | `VideoRenderer`, `CameraPreview`, `AudioPushPlayer`, `AudioPlayer` composables |
 
 ### Server Compatibility
 
-The built-in `WhepSignalingAdapter` / `WhipSignalingAdapter` work with any server that implements the standard [WHEP](https://www.ietf.org/archive/id/draft-murillo-whep-03.html) / [WHIP](https://www.ietf.org/archive/id/draft-ietf-wish-whip-01.html) protocol. For non-standard signaling, implement the `SignalingAdapter` interface (see [Custom Signaling Adapter](#5-custom-signaling-adapter)).
+The built-in `HttpSignalingAdapter` works with any server that implements the standard [WHEP](https://www.ietf.org/archive/id/draft-murillo-whep-03.html) / [WHIP](https://www.ietf.org/archive/id/draft-ietf-wish-whip-01.html) protocol (they share the same HTTP flow). For non-standard signaling, implement the `SignalingAdapter` interface (see [Custom Signaling Adapter](#7-custom-signaling-adapter)).
 
 | Media Server | WHEP (Receive) | WHIP (Send) | Notes |
 |-------------|:-:|:-:|-------|
@@ -190,32 +200,31 @@ Then add `mavenLocal()` to your repositories.
 
 ---
 
-## Quick Start
+## Quick Start (New Unified API)
 
-### 1. Receive Video (WHEP)
+### 1. Receive Video
 
-The simplest way to display a WebRTC video stream:
+Display a WebRTC video stream from any WHEP-compatible server:
 
 ```kotlin
+import com.syncrobotic.webrtc.config.*
 import com.syncrobotic.webrtc.session.*
 import com.syncrobotic.webrtc.signaling.*
 import com.syncrobotic.webrtc.ui.*
 
 @Composable
 fun VideoScreen() {
-    // 1. Create signaling adapter (once)
-    val signaling = remember {
-        WhepSignalingAdapter(url = "https://your-server/stream/whep")
+    val session = remember {
+        WebRTCSession(
+            signaling = HttpSignalingAdapter("https://your-server/stream/whep"),
+            mediaConfig = MediaConfig.RECEIVE_VIDEO  // receiveVideo + receiveAudio
+        )
     }
 
-    // 2. Create session (once)
-    val session = remember { WhepSession(signaling) }
-
-    // 3. Manage lifecycle (VideoRenderer auto-connects; do NOT call session.connect() manually)
     DisposableEffect(session) { onDispose { session.close() } }
 
-    // 4. Render video — auto-connects and sets up video sink internally
-    val controller = VideoRenderer(
+    // VideoRenderer auto-connects the session
+    VideoRenderer(
         session = session,
         modifier = Modifier.fillMaxSize(),
         onStateChange = { state ->
@@ -230,71 +239,123 @@ fun VideoScreen() {
 }
 ```
 
-### 2. Send Audio (WHIP)
+### 2. Send Camera + Audio
 
-Capture microphone audio and send to a WHIP endpoint:
+Capture camera and microphone, push to a WHIP endpoint:
 
 ```kotlin
-import com.syncrobotic.webrtc.session.*
-import com.syncrobotic.webrtc.signaling.*
-import com.syncrobotic.webrtc.audio.*
-
 @Composable
-fun AudioSendScreen() {
-    val signaling = remember {
-        WhipSignalingAdapter(url = "https://your-server/audio/whip")
-    }
-
+fun CameraStreamScreen() {
     val session = remember {
-        WhipSession(
-            signaling = signaling,
-            audioConfig = AudioPushConfig(
-                enableEchoCancellation = true,
-                enableNoiseSuppression = true,
-                enableAutoGainControl = true
-            )
+        WebRTCSession(
+            signaling = HttpSignalingAdapter("https://your-server/stream/whip"),
+            mediaConfig = MediaConfig.SEND_VIDEO  // sendVideo + sendAudio
         )
     }
 
-    LaunchedEffect(session) { session.connect() }
     DisposableEffect(session) { onDispose { session.close() } }
 
-    val controller = AudioPushPlayer(
+    // CameraPreview displays local camera and auto-connects
+    CameraPreview(
         session = session,
-        autoStart = true,
-        onStateChange = { state ->
-            when (state) {
-                is AudioPushState.Streaming -> println("Audio streaming")
-                is AudioPushState.Muted -> println("Muted")
-                is AudioPushState.Error -> println("Error: ${state.message}")
-                else -> {}
-            }
-        }
+        modifier = Modifier.fillMaxSize(),
+        mirror = true  // mirror for front camera
     )
 
-    // Control buttons
+    // Optional: mic controls
+    val audioController = AudioPushPlayer(session = session, autoStart = true)
+    Button(onClick = { audioController.toggleMute() }) {
+        Text(if (audioController.isMuted) "Unmute" else "Mute")
+    }
+}
+```
+
+### 3. Bidirectional Audio (Intercom)
+
+Send and receive audio in a single session:
+
+```kotlin
+@Composable
+fun IntercomScreen() {
+    val session = remember {
+        WebRTCSession(
+            signaling = HttpSignalingAdapter("https://your-server/intercom/whep"),
+            mediaConfig = MediaConfig.BIDIRECTIONAL_AUDIO  // sendAudio + receiveAudio
+        )
+    }
+
+    DisposableEffect(session) { onDispose { session.close() } }
+
+    // Receive remote audio
+    val playerController = AudioPlayer(session = session)
+
+    // Send local microphone
+    val pushController = AudioPushPlayer(session = session, autoStart = true)
+
     Column {
-        Button(onClick = { controller.start() }) { Text("Start") }
-        Button(onClick = { controller.stop() }) { Text("Stop") }
-        Button(onClick = { controller.toggleMute() }) {
-            Text(if (controller.isMuted) "Unmute" else "Mute")
+        Text("Intercom Active")
+        Button(onClick = { pushController.toggleMute() }) {
+            Text(if (pushController.isMuted) "Unmute" else "Mute")
+        }
+        Button(onClick = { playerController.setSpeakerphoneEnabled(true) }) {
+            Text("Speaker")
         }
     }
 }
 ```
 
-### 3. DataChannel Communication
+### 4. Full Video Call
+
+Send and receive both video and audio:
+
+```kotlin
+@Composable
+fun VideoCallScreen() {
+    val session = remember {
+        WebRTCSession(
+            signaling = HttpSignalingAdapter("https://your-server/room/webrtc"),
+            mediaConfig = MediaConfig.VIDEO_CALL  // send + receive video + audio
+        )
+    }
+
+    DisposableEffect(session) { onDispose { session.close() } }
+
+    Box(Modifier.fillMaxSize()) {
+        // Remote video (full screen)
+        VideoRenderer(session = session, modifier = Modifier.fillMaxSize())
+
+        // Local camera preview (small overlay)
+        CameraPreview(
+            session = session,
+            modifier = Modifier.size(120.dp).align(Alignment.TopEnd).padding(8.dp),
+            mirror = true
+        )
+    }
+
+    // Camera/mic controls
+    Row {
+        Button(onClick = { session.switchCamera() }) { Text("Flip") }
+        Button(onClick = { session.setVideoEnabled(false) }) { Text("Camera Off") }
+        Button(onClick = { session.setMuted(true) }) { Text("Mute") }
+    }
+}
+```
+
+### 5. DataChannel Communication
 
 Send and receive text/binary data through a WebRTC DataChannel:
 
 ```kotlin
+import com.syncrobotic.webrtc.config.*
 import com.syncrobotic.webrtc.session.*
 import com.syncrobotic.webrtc.signaling.*
 import com.syncrobotic.webrtc.datachannel.*
 
-// Works with either WhepSession or WhipSession
-val signaling = WhepSignalingAdapter(url = "https://your-server/stream/whep")
-val session = WhepSession(signaling)
+// DataChannel works with any MediaConfig
+val session = WebRTCSession(
+    signaling = HttpSignalingAdapter("https://your-server/stream/whep"),
+    mediaConfig = MediaConfig.RECEIVE_VIDEO
+)
 session.connect()
 
 // Create a reliable DataChannel
@@ -335,7 +396,7 @@ channel?.close()
 session.close()
 ```
 
-### 4. Authentication
+### 6. Authentication
 
 The library provides type-safe `SignalingAuth` for common authentication patterns — including **native cookie support**.
 
@@ -344,7 +405,7 @@ The library provides type-safe `SignalingAuth` for common authentication pattern
 #### JWT Bearer Token
 
 ```kotlin
-val signaling = WhepSignalingAdapter(
+val signaling = HttpSignalingAdapter(
     url = "https://api.example.com/streams/camera-1/whep",
     auth = SignalingAuth.Bearer(token = "eyJhbGciOiJIUzI1NiIs...")
 )
@@ -364,7 +425,7 @@ val cookies = loginResponse.setCookie().associate { it.name to it.value }
 // e.g. {"session" to "abc123", "csrf_token" to "xyz789"}
 
 // Step 2: Pass cookies to signaling adapter
-val signaling = WhepSignalingAdapter(
+val signaling = HttpSignalingAdapter(
     url = "https://api.example.com/streams/camera-1/whep",
     auth = SignalingAuth.Cookies(cookies)
 )
@@ -377,7 +438,7 @@ session.connect()
 ```kotlin
 // Works with any login method — OAuth, SSO, form login, etc.
 val oauthCookies = myOAuthFlow.getSessionCookies()
-val signaling = WhipSignalingAdapter(
+val signaling = HttpSignalingAdapter(
     url = "https://api.example.com/streams/audio/whip",
     auth = SignalingAuth.Cookies(oauthCookies)
 )
@@ -391,7 +452,7 @@ App                                    Library
    → 200 OK + Set-Cookie: session=abc
 2. Extract cookies from response
 3. Create SignalingAuth.Cookies(cookies)
-   Pass to WhepSignalingAdapter         
+   Pass to HttpSignalingAdapter         
                                        4. POST /whep + Cookie: session=abc + SDP
                                           → 201 + SDP answer
                                        5. PATCH /resource + Cookie: session=abc
@@ -417,11 +478,11 @@ class StreamViewModel : ViewModel() {
     fun connect() {
         viewModelScope.launch {
             val cookies = authRepo.getSessionCookies()
-            val signaling = WhepSignalingAdapter(
+            val signaling = HttpSignalingAdapter(
                 url = "https://api.example.com/streams/cam/whep",
                 auth = SignalingAuth.Cookies(cookies)
             )
-            session = WhepSession(signaling).also { s ->
+            session = WebRTCSession(signaling, MediaConfig.RECEIVE_VIDEO).also { s ->
                 s.connect()
                 s.state.collect { state ->
                     if (state is SessionState.Error && state.isRetryable) {
@@ -440,7 +501,7 @@ class StreamViewModel : ViewModel() {
 #### API Key / Custom Headers
 
 ```kotlin
-val signaling = WhepSignalingAdapter(
+val signaling = HttpSignalingAdapter(
     url = "https://api.example.com/streams/main/whep",
     auth = SignalingAuth.Custom(
         headers = mapOf(
@@ -462,7 +523,7 @@ import io.ktor.client.plugins.cookies.*
 // App-managed CookiesStorage — shared between your app's HttpClient and the library
 val sharedStorage = AcceptAllCookiesStorage()  // or your custom implementation
 
-val signaling = WhepSignalingAdapter(
+val signaling = HttpSignalingAdapter(
     url = "https://sso-server.example.com/stream/whep",
     auth = SignalingAuth.CookieStorage(storage = sharedStorage)
 )
@@ -478,7 +539,7 @@ val signaling = WhepSignalingAdapter(
 
 ```kotlin
 // Default — no auth headers, no plugins installed
-val signaling = WhepSignalingAdapter(
+val signaling = HttpSignalingAdapter(
     url = "https://open-server/stream/whep"
     // auth defaults to SignalingAuth.None
 )
@@ -503,14 +564,14 @@ val customHttpClient = HttpClient(OkHttp) {
     }
 }
 
-val signaling = WhepSignalingAdapter(
+val signaling = HttpSignalingAdapter(
     url = "https://api.example.com/streams/main/whep",
     auth = SignalingAuth.Bearer(token = jwt),
     httpClient = customHttpClient  // inject your own HttpClient
 )
 ```
 
-### 5. Custom Signaling Adapter
+### 7. Custom Signaling Adapter
 
 Implement `SignalingAdapter` for any signaling protocol (WebSocket, Firebase, MQTT, gRPC, etc.).
 
@@ -567,12 +628,12 @@ class WebSocketSignalingAdapter(
 
 // Usage — same Session API, different transport
 val signaling = WebSocketSignalingAdapter(wsUrl = "wss://server/signaling")
-val session = WhepSession(signaling)
+val session = WebRTCSession(signaling, MediaConfig.RECEIVE_VIDEO)
 session.connect()
 ```
 
 > **When to use which?**
-> - `WhepSignalingAdapter` / `WhipSignalingAdapter` — Standard WHEP/WHIP servers (Cloudflare, MediaMTX, Janus, OBS WHIP)
+> - `HttpSignalingAdapter` — Standard WHEP/WHIP servers (Cloudflare, MediaMTX, GStreamer, OBS WHIP)
 > - `WebSocketSignalingAdapter` (custom) — Custom backends with WebSocket-based signaling
 > - `FirebaseSignalingAdapter` (custom) — Serverless / P2P scenarios with Firestore
 
@@ -629,7 +690,7 @@ class FirebaseSignalingAdapter(
 
 // Usage — same Session API, different signaling
 val signaling = FirebaseSignalingAdapter(roomId = "room-123", firestore)
-val session = WhepSession(signaling)
+val session = WebRTCSession(signaling, MediaConfig.VIDEO_CALL)
 session.connect()
 ```
 
@@ -671,9 +732,77 @@ session.connect()
 
 ## API Reference
 
+### WebRTCSession
+
+The unified session class for all WebRTC scenarios. Media directions are configured via `MediaConfig`.
+
+```kotlin
+expect class WebRTCSession(
+    signaling: SignalingAdapter,
+    mediaConfig: MediaConfig,
+    webrtcConfig: WebRTCConfig = WebRTCConfig.DEFAULT,
+    retryConfig: RetryConfig = RetryConfig.DEFAULT
+) {
+    val state: StateFlow<SessionState>
+    val stats: StateFlow<WebRTCStats?>
+    suspend fun connect()
+    fun createDataChannel(config: DataChannelConfig): DataChannel?
+    fun setAudioEnabled(enabled: Boolean)       // incoming audio playback
+    fun setSpeakerphoneEnabled(enabled: Boolean) // speaker vs earpiece
+    fun setMuted(muted: Boolean)                // microphone mute
+    fun toggleMute()
+    fun setVideoEnabled(enabled: Boolean)       // camera on/off
+    fun switchCamera()                          // front/rear toggle
+    fun close()
+}
+```
+
+### MediaConfig
+
+Controls which media types are sent and/or received:
+
+```kotlin
+data class MediaConfig(
+    val receiveVideo: Boolean = false,
+    val receiveAudio: Boolean = false,
+    val sendVideo: Boolean = false,
+    val sendAudio: Boolean = false,
+    val audioConfig: AudioPushConfig = AudioPushConfig(),
+    val videoConfig: VideoCaptureConfig = VideoCaptureConfig.HD
+)
+```
+
+| Preset | Description | Use Case |
+|--------|-------------|----------|
+| `MediaConfig.RECEIVE_VIDEO` | receiveVideo + receiveAudio | Watching a stream |
+| `MediaConfig.SEND_AUDIO` | sendAudio only | Push microphone to server |
+| `MediaConfig.SEND_VIDEO` | sendVideo + sendAudio | Camera live streaming |
+| `MediaConfig.BIDIRECTIONAL_AUDIO` | sendAudio + receiveAudio | Voice intercom |
+| `MediaConfig.VIDEO_CALL` | send + receive all | Full video call |
+
+Or create custom combinations:
+```kotlin
+// Receive video + send audio (intercom with video monitoring)
+MediaConfig(receiveVideo = true, receiveAudio = true, sendAudio = true)
+```
+
+### HttpSignalingAdapter
+
+Unified HTTP signaling adapter — replaces `WhepSignalingAdapter` and `WhipSignalingAdapter`:
+
+```kotlin
+class HttpSignalingAdapter(
+    url: String,
+    auth: SignalingAuth = SignalingAuth.None,
+    httpClient: HttpClient? = null
+) : SignalingAdapter
+```
+
+WHEP and WHIP use the exact same HTTP flow (POST offer → 201 answer → PATCH ICE → DELETE teardown). The only difference is the URL endpoint.
+
 ### SignalingAdapter
 
-The pluggable interface for SDP offer/answer exchange. Built-in implementations: `WhepSignalingAdapter`, `WhipSignalingAdapter`.
+The pluggable interface for SDP offer/answer exchange. Built-in implementation: `HttpSignalingAdapter`.
 
 ```kotlin
 interface SignalingAdapter {
@@ -744,159 +873,67 @@ sealed interface SignalingAuth {
 }
 ```
 
-#### WhepSignalingAdapter
-
-Standard WHEP (WebRTC-HTTP Egress Protocol) signaling for **receiving** streams.
-
-```kotlin
-class WhepSignalingAdapter(
-    url: String,                                    // WHEP endpoint URL
-    auth: SignalingAuth = SignalingAuth.None,        // Authentication method
-    httpClient: HttpClient? = null                  // Optional: inject custom Ktor HttpClient
-) : SignalingAdapter
-```
-
-#### WhipSignalingAdapter
-
-Standard WHIP (WebRTC-HTTP Ingress Protocol) signaling for **sending** streams.
-
-```kotlin
-class WhipSignalingAdapter(
-    url: String,                                    // WHIP endpoint URL
-    auth: SignalingAuth = SignalingAuth.None,        // Authentication method
-    httpClient: HttpClient? = null                  // Optional: inject custom Ktor HttpClient
-) : SignalingAdapter
-```
-
-> **HttpClient plugin guarantee**: `SignalingAuth.None`, `Bearer`, `Cookies`, and `Custom` **never** install the Ktor `HttpCookies` plugin — they only manipulate HTTP headers. This ensures zero conflicts when you inject a custom `httpClient`.
->
-> Only `SignalingAuth.CookieStorage` installs the `HttpCookies` plugin (using the `CookiesStorage` you provide), enabling shared cookie jar and automatic `Set-Cookie` handling.
-
 ---
 
-### WhepSession
+### Composables
 
-Manages a WebRTC connection for **receiving** video/audio. Handles the full PeerConnection lifecycle: SDP negotiation, ICE gathering, auto-reconnect, stats collection.
+All composables accept `WebRTCSession` and auto-connect if the session is idle.
 
-> **Audio playback**: Incoming audio is automatically played through the device speaker — no extra composable needed. Use `setAudioEnabled(false)` to mute and `setSpeakerphoneEnabled(false)` to route audio to the earpiece/headphones (Android/iOS only). Default is **speaker ON**.
+> **Important**: Composables **auto-connect** the session internally. Do **not** call `session.connect()` manually when using composables — use `DisposableEffect` for cleanup only.
 
-```kotlin
-expect class WhepSession(
-    signaling: SignalingAdapter,
-    config: WebRTCConfig = WebRTCConfig.DEFAULT,
-    retryConfig: RetryConfig = RetryConfig.DEFAULT
-) {
-    /** Reactive connection state. */
-    val state: StateFlow<SessionState>
-
-    /** Reactive connection statistics (updated every ~1s while connected). */
-    val stats: StateFlow<WebRTCStats?>
-
-    /** Establish the WebRTC connection. Suspend until connected or failed. */
-    suspend fun connect()
-
-    /** Create a DataChannel on this connection. Call after connect(). */
-    fun createDataChannel(config: DataChannelConfig): DataChannel?
-
-    /** Enable/disable incoming audio playback. */
-    fun setAudioEnabled(enabled: Boolean)
-
-    /** Toggle speakerphone output (Android/iOS only). */
-    fun setSpeakerphoneEnabled(enabled: Boolean)
-
-    /** Close the connection and release all resources. */
-    fun close()
-}
-```
-
-**Usage without Compose** (ViewModel, Service, etc.):
-
-```kotlin
-val session = WhepSession(
-    signaling = WhepSignalingAdapter(url, headers),
-    config = WebRTCConfig.DEFAULT,
-    retryConfig = RetryConfig.DEFAULT
-)
-
-// Observe state reactively
-session.state.collect { state ->
-    when (state) {
-        is SessionState.Connected -> println("Connected!")
-        is SessionState.Reconnecting -> println("Retry ${state.attempt}/${state.maxAttempts}")
-        is SessionState.Error -> println("Error: ${state.message}, retryable: ${state.isRetryable}")
-        else -> {}
-    }
-}
-```
-
----
-
-### WhipSession
-
-Manages a WebRTC connection for **sending** audio (microphone capture). Handles audio capture, encoding, WHIP signaling, auto-reconnect.
-
-```kotlin
-expect class WhipSession(
-    signaling: SignalingAdapter,
-    audioConfig: AudioPushConfig = AudioPushConfig(),
-    retryConfig: RetryConfig = RetryConfig.DEFAULT
-) {
-    /** Reactive connection state. */
-    val state: StateFlow<SessionState>
-
-    /** Reactive connection statistics. */
-    val stats: StateFlow<WebRTCStats?>
-
-    /** Establish the WebRTC connection and start audio capture. */
-    suspend fun connect()
-
-    /** Create a DataChannel on this connection. Call after connect(). */
-    fun createDataChannel(config: DataChannelConfig): DataChannel?
-
-    /** Mute/unmute the microphone. */
-    fun setMuted(muted: Boolean)
-
-    /** Toggle mute state. */
-    fun toggleMute()
-
-    /** Close the connection and release all resources (microphone, PeerConnection). */
-    fun close()
-}
-```
-
----
-
-### VideoRenderer
-
-Compose Multiplatform composable for rendering video from a `WhepSession`. Works on Android, iOS, and JVM/Desktop.
-
-> **Important**: `VideoRenderer` **auto-connects** the session internally. Do **not** call `session.connect()` manually when using `VideoRenderer` — this causes a race condition where the video sink is not attached, resulting in a black screen. Only use `DisposableEffect` for cleanup.
+#### VideoRenderer — Display Remote Video
 
 ```kotlin
 @Composable
-expect fun VideoRenderer(
-    session: WhepSession,
+fun VideoRenderer(
+    session: WebRTCSession,
     modifier: Modifier = Modifier,
-    onStateChange: OnPlayerStateChange = {},
-    onEvent: OnPlayerEvent = {}
+    onStateChange: ((PlayerState) -> Unit)? = null,
+    onEvent: ((PlayerEvent) -> Unit)? = null,
 ): VideoPlayerController
 ```
 
-**Returns** a `VideoPlayerController` for programmatic control:
+Built-in connection status overlay — automatically displays connecting/reconnecting/error states.
+
+#### CameraPreview — Display Local Camera
 
 ```kotlin
-interface VideoPlayerController {
-    fun play()
-    fun pause()
-    fun stop()
-    fun seekTo(positionMs: Long)
-    val currentPosition: Long
-    val duration: Long
-    val isPlaying: Boolean
-}
+@Composable
+fun CameraPreview(
+    session: WebRTCSession,
+    modifier: Modifier = Modifier,
+    mirror: Boolean = true,                       // mirror for front camera
+    onStateChange: ((PlayerState) -> Unit)? = null,
+)
 ```
 
-**Built-in connection status overlay** — automatically displays connecting/reconnecting/error states with appropriate icons and messages. No extra UI code needed.
+Requires `mediaConfig.sendVideo = true`.
+
+#### AudioPushPlayer — Microphone Controls
+
+```kotlin
+@Composable
+fun AudioPushPlayer(
+    session: WebRTCSession,
+    autoStart: Boolean = true,
+    onStateChange: ((AudioPushState) -> Unit)? = null,
+): AudioPushController
+```
+
+Returns `AudioPushController` with `start()`, `stop()`, `setMuted()`, `toggleMute()`, `stats`.
+
+#### AudioPlayer — Remote Audio Playback
+
+```kotlin
+@Composable
+fun AudioPlayer(
+    session: WebRTCSession,
+    autoStart: Boolean = true,
+    onStateChange: ((AudioPlaybackState) -> Unit)? = null,
+): AudioPlayerController
+```
+
+Returns `AudioPlayerController` with `setAudioEnabled()`, `setSpeakerphoneEnabled()`, `stop()`.
 
 ---
 
@@ -1818,6 +1855,45 @@ All v1.x APIs are `@Deprecated` but still functional. You can migrate incrementa
 5. Replace direct `WebRTCClient` usage → `WhepSession` / `WhipSession`
 
 Deprecated APIs will be removed in v3.0.
+
+---
+
+## Migration Guide
+
+### From WhepSession/WhipSession to WebRTCSession
+
+The legacy `WhepSession` / `WhipSession` and `WhepSignalingAdapter` / `WhipSignalingAdapter` are deprecated and will be removed in v3.0. Migration is straightforward:
+
+| Old API | New API |
+|---------|---------|
+| `WhepSignalingAdapter(url)` | `HttpSignalingAdapter(url)` |
+| `WhipSignalingAdapter(url)` | `HttpSignalingAdapter(url)` |
+| `WhepSession(signaling)` | `WebRTCSession(signaling, MediaConfig.RECEIVE_VIDEO)` |
+| `WhipSession(signaling)` | `WebRTCSession(signaling, MediaConfig.SEND_AUDIO)` |
+| `VideoRenderer(session: WhepSession)` | `VideoRenderer(session: WebRTCSession)` |
+| `AudioPushPlayer(session: WhipSession)` | `AudioPushPlayer(session: WebRTCSession)` |
+
+**Before:**
+```kotlin
+val signaling = WhepSignalingAdapter(url = "https://server/stream/whep")
+val session = WhepSession(signaling)
+VideoRenderer(session = session, modifier = Modifier.fillMaxSize())
+```
+
+**After:**
+```kotlin
+val session = WebRTCSession(
+    signaling = HttpSignalingAdapter("https://server/stream/whep"),
+    mediaConfig = MediaConfig.RECEIVE_VIDEO
+)
+VideoRenderer(session = session, modifier = Modifier.fillMaxSize())
+```
+
+The new API additionally unlocks:
+- Camera capture via `MediaConfig.SEND_VIDEO`
+- Bidirectional audio via `MediaConfig.BIDIRECTIONAL_AUDIO`
+- Full video calls via `MediaConfig.VIDEO_CALL`
+- Any custom combination of `sendVideo` / `sendAudio` / `receiveVideo` / `receiveAudio`
 
 ---
 
