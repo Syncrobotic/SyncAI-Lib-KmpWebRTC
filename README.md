@@ -114,11 +114,14 @@ The SDK is organized into three layers. Application code interacts with **Layer 
 | **Video Receive** | Receive streams via any HTTP-based signaling (WHEP, custom) |
 | **Audio Send/Receive** | Microphone capture + remote audio playback in same or separate sessions |
 | **DataChannel** | Bidirectional text/JSON and binary (images, files) messaging |
-| **Custom Signaling** | Pluggable `SignalingAdapter` — implement any signaling protocol |
+| **Custom Signaling** | Pluggable `SignalingAdapter` — implement any signaling protocol (HTTP, WebSocket, Firebase, MQTT, gRPC) |
+| **ICE Mode Control** | `FULL_ICE` (all candidates in offer) or `TRICKLE_ICE` (incremental via PATCH) — configurable per session |
+| **STUN/TURN Support** | Built-in ICE server configuration for NAT traversal and relay, including custom TURN credentials |
 | **Built-in Auth** | JWT Bearer, Cookie (app-managed), API key, custom headers |
 | **Auto Reconnect** | Configurable exponential backoff with jitter |
 | **Real-time Stats** | RTT, packet loss, bitrate, codec via `StateFlow<WebRTCStats?>` |
 | **Compose UI** | `VideoRenderer`, `CameraPreview`, `AudioPushPlayer`, `AudioPlayer` composables |
+| **Low-level Access** | `onRemoteVideoFrame` / `onLocalVideoTrack` callbacks for fully custom rendering |
 
 ### Server Compatibility
 
@@ -135,6 +138,62 @@ The built-in `HttpSignalingAdapter` works with any server that implements the st
 | **LiveKit** | ❌ | ❌ | Custom `SignalingAdapter` required (proprietary signaling) |
 | **Ant Media Server** | ❌ | ❌ | Custom `SignalingAdapter` required (WebSocket-based) |
 | **Custom Backend** | — | — | Implement `SignalingAdapter` for any protocol (WebSocket, gRPC, Firebase, MQTT, etc.) |
+
+### ICE Mode: Full ICE vs Trickle ICE
+
+The library supports both ICE gathering modes, configurable per session via `WebRTCConfig.iceMode`:
+
+| Mode | Behavior | Server Requirement |
+|------|----------|-------------------|
+| `IceMode.FULL_ICE` (default) | Gathers all ICE candidates first, includes them in the SDP offer sent via POST | Any WHEP/WHIP server |
+| `IceMode.TRICKLE_ICE` | Sends SDP offer immediately, then sends candidates individually via HTTP PATCH | Server must support trickle ICE (RFC 8838) |
+
+```kotlin
+WebRTCConfig(iceMode = IceMode.TRICKLE_ICE)  // faster connection setup
+WebRTCConfig(iceMode = IceMode.FULL_ICE)     // simpler, wider compatibility
+```
+
+### STUN/TURN Server Support
+
+Built-in support for STUN and TURN servers via `WebRTCConfig.iceServers`. Default includes Google's public STUN server.
+
+```kotlin
+WebRTCConfig(
+    iceServers = listOf(
+        IceServer(urls = listOf("stun:stun.l.google.com:19302")),        // NAT discovery
+        IceServer(                                                        // Relay fallback
+            urls = listOf("turn:your-turn.example.com:3478"),
+            username = "user",
+            credential = "password"
+        )
+    ),
+    iceTransportPolicy = "all"   // "all" = try direct first, fallback to TURN
+                                  // "relay" = force all traffic through TURN
+)
+```
+
+> **Note**: STUN/TURN is a **client-side** configuration. The STUN/TURN server itself is separate infrastructure (e.g. [coturn](https://github.com/coturn/coturn)). The signaling server (WHEP/WHIP endpoint) is unrelated to STUN/TURN.
+
+### WebSocket Signaling Support
+
+The library's signaling layer is protocol-agnostic. While `HttpSignalingAdapter` handles HTTP-based WHEP/WHIP out of the box, WebSocket signaling is supported by implementing the `SignalingAdapter` interface:
+
+```kotlin
+// Custom WebSocket signaling — full example in Quick Start section
+class MyWebSocketSignaling(wsUrl: String) : SignalingAdapter {
+    override suspend fun sendOffer(sdpOffer: String): SignalingResult { /* WS send/receive */ }
+    override suspend fun sendIceCandidate(...) { /* WS send */ }
+    override suspend fun terminate(...) { /* WS close */ }
+}
+
+// Same WebRTCSession API, different transport
+val session = WebRTCSession(
+    signaling = MyWebSocketSignaling("wss://my-server/signaling"),
+    mediaConfig = MediaConfig.VIDEO_CALL
+)
+```
+
+This enables integration with any signaling backend: WebSocket, Firebase Firestore, MQTT, gRPC, or proprietary protocols — all using the same `WebRTCSession` API.
 
 ---
 
