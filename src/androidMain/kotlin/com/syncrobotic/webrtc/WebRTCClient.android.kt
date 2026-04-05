@@ -286,6 +286,11 @@ actual class WebRTCClient {
     }
 
     /**
+     * Get the local video track (for camera preview rendering).
+     */
+    fun getLocalVideoTrack(): org.webrtc.VideoTrack? = localVideoTrack
+
+    /**
      * Enable or disable the local video track.
      */
     fun setVideoEnabled(enabled: Boolean) {

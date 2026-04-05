@@ -763,6 +763,11 @@ actual class WebRTCClient {
     actual fun getVideoSink(): Any? = videoTrack
     
     /**
+     * Get the local video track (for camera preview rendering).
+     */
+    fun getLocalVideoTrack(): RTCVideoTrack? = localVideoTrack
+
+    /**
      * Create a Metal-based video view for rendering.
      * Call this to get a UIView that can be added to the SwiftUI/UIKit hierarchy.
      */

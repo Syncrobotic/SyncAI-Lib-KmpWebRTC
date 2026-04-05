@@ -551,6 +551,8 @@ actual class WebRTCClient {
 
     fun getCurrentFps(): Float = currentFps.toFloat()
 
+    fun getLocalVideoTrack(): dev.onvoid.webrtc.media.video.VideoTrack? = localVideoTrack
+
     actual fun getLocalDescription(): String? = peerConnection?.localDescription?.sdp
 
     actual fun getVideoSink(): Any? = videoSink.get()
