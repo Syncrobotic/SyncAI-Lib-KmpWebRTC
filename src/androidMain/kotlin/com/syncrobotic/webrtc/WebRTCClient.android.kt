@@ -23,6 +23,12 @@ actual class WebRTCClient {
     private var audioSource: AudioSource? = null
     private var localAudioTrack: AudioTrack? = null
     private var _isAudioEnabled = true
+
+    private var videoCapturer: org.webrtc.CameraVideoCapturer? = null
+    private var localVideoSource: org.webrtc.VideoSource? = null
+    private var localVideoTrack: org.webrtc.VideoTrack? = null
+    private var surfaceTextureHelper: org.webrtc.SurfaceTextureHelper? = null
+    private var _isVideoEnabled = true
     
     private var audioManager: AudioManager? = null
     private var _isSpeakerphoneEnabled = true
@@ -221,6 +227,72 @@ actual class WebRTCClient {
         configureSpeakerphone(context, true)
     }
     
+    /**
+     * Initialize camera capture for sending video.
+     * Call after initializeForSending() or initializeWithContext().
+     */
+    fun initializeCameraCapture(context: android.content.Context, config: com.syncrobotic.webrtc.config.VideoCaptureConfig) {
+        val factory = peerConnectionFactory ?: return
+
+        // Create camera capturer
+        val camera2Enumerator = org.webrtc.Camera2Enumerator(context)
+        val deviceNames = camera2Enumerator.deviceNames
+
+        // Select front or rear camera
+        val targetDeviceName = if (config.useFrontCamera) {
+            deviceNames.firstOrNull { camera2Enumerator.isFrontFacing(it) }
+        } else {
+            deviceNames.firstOrNull { camera2Enumerator.isBackFacing(it) }
+        } ?: deviceNames.firstOrNull()
+
+        if (targetDeviceName == null) {
+            android.util.Log.e("WebRTCClient", "No camera device found")
+            return
+        }
+
+        videoCapturer = camera2Enumerator.createCapturer(targetDeviceName, null)
+
+        // Create surface texture helper for video processing
+        surfaceTextureHelper = org.webrtc.SurfaceTextureHelper.create(
+            "CaptureThread",
+            eglBase?.eglBaseContext
+        )
+
+        // Create video source
+        localVideoSource = factory.createVideoSource(videoCapturer!!.isScreencast)
+        videoCapturer?.initialize(surfaceTextureHelper, context, localVideoSource?.capturerObserver)
+
+        // Start capture
+        videoCapturer?.startCapture(config.width, config.height, config.fps)
+
+        // Create video track
+        localVideoTrack = factory.createVideoTrack("local-video", localVideoSource)
+        localVideoTrack?.setEnabled(true)
+        _isVideoEnabled = true
+
+        // Add track to peer connection
+        localVideoTrack?.let { track ->
+            peerConnection?.addTrack(track, listOf("local-video-stream"))
+        }
+
+        android.util.Log.d("WebRTCClient", "Camera capture initialized: ${config.width}x${config.height}@${config.fps}fps, device=$targetDeviceName")
+    }
+
+    /**
+     * Switch between front and rear camera.
+     */
+    fun switchCamera() {
+        (videoCapturer as? org.webrtc.CameraVideoCapturer)?.switchCamera(null)
+    }
+
+    /**
+     * Enable or disable the local video track.
+     */
+    fun setVideoEnabled(enabled: Boolean) {
+        localVideoTrack?.setEnabled(enabled)
+        _isVideoEnabled = enabled
+    }
+
     private fun configureSpeakerphone(context: Context, enabled: Boolean) {
         try {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -467,10 +539,18 @@ actual class WebRTCClient {
                     com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY -> RtpTransceiver.RtpTransceiverDirection.RECV_ONLY
                     com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV -> RtpTransceiver.RtpTransceiverDirection.SEND_RECV
                 }
-                pc.addTransceiver(
-                    MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
-                    RtpTransceiver.RtpTransceiverInit(nativeDir)
-                )
+                if (dir.isSending && localVideoTrack != null) {
+                    // Use the real local video track for sending
+                    pc.addTransceiver(
+                        localVideoTrack,
+                        RtpTransceiver.RtpTransceiverInit(nativeDir)
+                    )
+                } else {
+                    pc.addTransceiver(
+                        MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
+                        RtpTransceiver.RtpTransceiverInit(nativeDir)
+                    )
+                }
             }
 
             // Audio transceiver
@@ -668,7 +748,20 @@ actual class WebRTCClient {
 
     actual fun close() {
         listener = null
-        
+
+        // Video capture cleanup
+        try {
+            videoCapturer?.stopCapture()
+        } catch (_: Exception) {}
+        videoCapturer?.dispose()
+        videoCapturer = null
+        localVideoSource?.dispose()
+        localVideoSource = null
+        localVideoTrack?.dispose()
+        localVideoTrack = null
+        surfaceTextureHelper?.dispose()
+        surfaceTextureHelper = null
+
         localAudioTrack?.setEnabled(false)
         localAudioTrack?.dispose()
         localAudioTrack = null
@@ -696,6 +789,7 @@ actual class WebRTCClient {
         iceGatheringComplete = false
         _connectionState = WebRTCState.CLOSED
         _isAudioEnabled = true
+        _isVideoEnabled = true
         
         try {
             audioManager?.let { am ->

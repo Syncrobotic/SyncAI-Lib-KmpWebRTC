@@ -26,6 +26,9 @@ actual class WebRTCClient {
     private var localAudioSource: dev.onvoid.webrtc.media.audio.AudioTrackSource? = null
     private var localAudioTrack: dev.onvoid.webrtc.media.audio.AudioTrack? = null
     private var localVideoTrack: VideoTrack? = null
+    private var localVideoSource: dev.onvoid.webrtc.media.video.VideoDeviceSource? = null
+    private var videoCaptureDevice: dev.onvoid.webrtc.media.video.VideoDevice? = null
+    private var _isVideoEnabled = true
     private var _isAudioEnabled = true
     
     // Protection flag to prevent double-close and close during native callback
@@ -140,6 +143,61 @@ actual class WebRTCClient {
         }
     }
     
+    fun initializeCameraCapture(config: com.syncrobotic.webrtc.config.VideoCaptureConfig) {
+        val factory = peerConnectionFactory ?: return
+
+        // Get available video devices
+        val devices = dev.onvoid.webrtc.media.MediaDevices.getVideoCaptureDevices()
+        if (devices.isEmpty()) {
+            println("[WebRTCClient] [JVM] No video capture devices found")
+            return
+        }
+
+        // Select device (front camera preference is not applicable on desktop, use first available)
+        videoCaptureDevice = devices.firstOrNull()
+        val device = videoCaptureDevice ?: return
+
+        println("[WebRTCClient] [JVM] Using video device: ${device.name}")
+
+        // Create video source from device
+        localVideoSource = VideoDeviceSource()
+        localVideoSource?.setVideoCaptureDevice(device)
+        localVideoSource?.setVideoCaptureCapability(
+            dev.onvoid.webrtc.media.video.VideoCaptureCapability(config.width, config.height, config.fps)
+        )
+
+        // Create video track
+        localVideoTrack = factory.createVideoTrack("local-video", localVideoSource)
+        localVideoTrack?.setEnabled(true)
+        _isVideoEnabled = true
+
+        // Add track to peer connection
+        localVideoTrack?.let { track ->
+            peerConnection?.addTrack(track, listOf("local-video-stream"))
+        }
+
+        // Start capture
+        localVideoSource?.start()
+    }
+
+    fun switchCamera() {
+        // Desktop typically has only one camera, but cycle through available devices
+        val devices = dev.onvoid.webrtc.media.MediaDevices.getVideoCaptureDevices()
+        if (devices.size <= 1) return
+
+        val currentIndex = devices.indexOf(videoCaptureDevice)
+        val nextIndex = (currentIndex + 1) % devices.size
+        videoCaptureDevice = devices[nextIndex]
+
+        localVideoSource?.setVideoCaptureDevice(videoCaptureDevice)
+        println("[WebRTCClient] [JVM] Switched to camera: ${videoCaptureDevice?.name}")
+    }
+
+    fun setVideoEnabled(enabled: Boolean) {
+        localVideoTrack?.setEnabled(enabled)
+        _isVideoEnabled = enabled
+    }
+
     private fun createPeerConnectionObserver(): PeerConnectionObserver {
         return object : PeerConnectionObserver {
             override fun onSignalingChange(state: RTCSignalingState) {}
@@ -388,17 +446,21 @@ actual class WebRTCClient {
                     com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY -> RTCRtpTransceiverDirection.RECV_ONLY
                     com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV -> RTCRtpTransceiverDirection.SEND_RECV
                 }
-                val track = if (dir.isSending && localVideoTrack != null) {
-                    localVideoTrack
+                if (dir.isSending && localVideoTrack != null) {
+                    // Track already added by initializeCameraCapture() — set direction on existing transceiver
+                    val transceivers = pc.transceivers
+                    transceivers?.firstOrNull()?.let { it.direction = nativeDir }
                 } else {
-                    if (dummyVideoTrack == null) {
+                    val track = if (dummyVideoTrack == null) {
                         dummyVideoSource = CustomVideoSource()
                         dummyVideoTrack = factory.createVideoTrack("dummy-video", dummyVideoSource)
+                        dummyVideoTrack
+                    } else {
+                        dummyVideoTrack
                     }
-                    dummyVideoTrack
+                    val init = RTCRtpTransceiverInit().apply { direction = nativeDir }
+                    pc.addTransceiver(track, init)
                 }
-                val init = RTCRtpTransceiverInit().apply { direction = nativeDir }
-                pc.addTransceiver(track, init)
             }
 
             // Audio transceiver
@@ -537,6 +599,12 @@ actual class WebRTCClient {
         frameCount = 0
         lastFpsUpdateTime = 0
         currentFps = 0.0
+
+        localVideoSource?.stop()
+        localVideoSource?.dispose()
+        localVideoSource = null
+        localVideoTrack = null
+        videoCaptureDevice = null
 
         localAudioTrack?.setEnabled(false)
         localAudioTrack = null

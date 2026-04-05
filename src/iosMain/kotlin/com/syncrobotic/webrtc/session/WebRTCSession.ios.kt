@@ -105,6 +105,11 @@ actual class WebRTCSession actual constructor(
             })
         }
 
+        // Initialize camera capture if sendVideo is enabled
+        if (mediaConfig.sendVideo) {
+            client.initializeCameraCapture(mediaConfig.videoConfig)
+        }
+
         onClientReady?.invoke(client)
 
         // Create pending DataChannels before SDP offer
@@ -233,11 +238,15 @@ actual class WebRTCSession actual constructor(
     }
 
     actual fun setVideoEnabled(enabled: Boolean) {
-        // Will be implemented in Phase 5 (Camera Capture)
+        if (mediaConfig.sendVideo) {
+            client.setVideoEnabled(enabled)
+        }
     }
 
     actual fun switchCamera() {
-        // Will be implemented in Phase 5 (Camera Capture)
+        if (mediaConfig.sendVideo) {
+            client.switchCamera()
+        }
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────
