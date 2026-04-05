@@ -11,24 +11,26 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * Manages a WebRTC connection for **receiving** video/audio via WHEP.
  *
- * Handles the full PeerConnection lifecycle: SDP negotiation, ICE gathering,
- * auto-reconnect, and stats collection. Incoming audio is automatically played
- * through the device speaker.
- *
+ * **Deprecated:** Use [WebRTCSession] with [MediaConfig.RECEIVE_VIDEO] instead:
  * ```kotlin
- * val signaling = WhepSignalingAdapter(url = "https://server/stream/whep")
- * val session = WhepSession(signaling)
- * session.connect()
- * // Observe state
- * session.state.collect { state -> ... }
- * // Cleanup
- * session.close()
+ * val session = WebRTCSession(
+ *     signaling = HttpSignalingAdapter("https://server/stream/whep"),
+ *     mediaConfig = MediaConfig.RECEIVE_VIDEO
+ * )
  * ```
  *
- * @param signaling Signaling adapter for SDP exchange (e.g. [WhepSignalingAdapter])
+ * @param signaling Signaling adapter for SDP exchange
  * @param config WebRTC configuration including ICE servers
  * @param retryConfig Retry configuration for auto-reconnect
  */
+@Deprecated(
+    message = "Use WebRTCSession with MediaConfig.RECEIVE_VIDEO instead. WhepSession will be removed in v3.0.",
+    replaceWith = ReplaceWith(
+        "WebRTCSession(signaling, MediaConfig.RECEIVE_VIDEO, config, retryConfig)",
+        "com.syncrobotic.webrtc.session.WebRTCSession",
+        "com.syncrobotic.webrtc.config.MediaConfig"
+    )
+)
 expect class WhepSession(
     signaling: SignalingAdapter,
     config: WebRTCConfig = WebRTCConfig.DEFAULT,

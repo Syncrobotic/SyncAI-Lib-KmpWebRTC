@@ -10,22 +10,17 @@ import io.ktor.http.*
 /**
  * WHEP (WebRTC-HTTP Egress Protocol) signaling adapter for **receiving** streams.
  *
- * Wraps the standard WHEP HTTP flow (POST offer → 201 answer, PATCH ICE, DELETE teardown)
- * with pluggable [SignalingAuth] support.
- *
- * ```kotlin
- * val adapter = WhepSignalingAdapter(
- *     url = "https://server/stream/whep",
- *     auth = SignalingAuth.Bearer("my-jwt-token")
- * )
- * val result = adapter.sendOffer(localSdp)
- * ```
+ * **Deprecated:** Use [HttpSignalingAdapter] instead — it handles both WHEP and WHIP
+ * with identical HTTP flow.
  *
  * @param url WHEP endpoint URL
  * @param auth Authentication configuration (default: [SignalingAuth.None])
- * @param httpClient Optional pre-configured [HttpClient]. When `null`, one is created
- *   automatically using the default platform engine.
+ * @param httpClient Optional pre-configured [HttpClient]
  */
+@Deprecated(
+    message = "Use HttpSignalingAdapter instead. WhepSignalingAdapter will be removed in v3.0.",
+    replaceWith = ReplaceWith("HttpSignalingAdapter(url, auth, httpClient)", "com.syncrobotic.webrtc.signaling.HttpSignalingAdapter")
+)
 class WhepSignalingAdapter(
     private val url: String,
     private val auth: SignalingAuth = SignalingAuth.None,
@@ -114,20 +109,17 @@ class WhepSignalingAdapter(
 /**
  * WHIP (WebRTC-HTTP Ingress Protocol) signaling adapter for **sending** streams.
  *
- * Same HTTP flow as WHEP but semantically used for ingress (audio/video push).
- *
- * ```kotlin
- * val adapter = WhipSignalingAdapter(
- *     url = "https://server/stream/whip",
- *     auth = SignalingAuth.Custom(mapOf("X-Api-Key" to "secret"))
- * )
- * val result = adapter.sendOffer(localSdp)
- * ```
+ * **Deprecated:** Use [HttpSignalingAdapter] instead — it handles both WHEP and WHIP
+ * with identical HTTP flow.
  *
  * @param url WHIP endpoint URL
  * @param auth Authentication configuration (default: [SignalingAuth.None])
  * @param httpClient Optional pre-configured [HttpClient]
  */
+@Deprecated(
+    message = "Use HttpSignalingAdapter instead. WhipSignalingAdapter will be removed in v3.0.",
+    replaceWith = ReplaceWith("HttpSignalingAdapter(url, auth, httpClient)", "com.syncrobotic.webrtc.signaling.HttpSignalingAdapter")
+)
 class WhipSignalingAdapter(
     private val url: String,
     private val auth: SignalingAuth = SignalingAuth.None,

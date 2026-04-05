@@ -11,20 +11,26 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * Manages a WebRTC connection for **sending** audio (microphone capture) via WHIP.
  *
- * Handles audio capture, encoding, WHIP signaling, auto-reconnect, and stats collection.
- *
+ * **Deprecated:** Use [WebRTCSession] with [MediaConfig.SEND_AUDIO] instead:
  * ```kotlin
- * val signaling = WhipSignalingAdapter(url = "https://server/stream/whip")
- * val session = WhipSession(signaling)
- * session.connect()    // starts audio capture + streaming
- * session.setMuted(true)
- * session.close()
+ * val session = WebRTCSession(
+ *     signaling = HttpSignalingAdapter("https://server/stream/whip"),
+ *     mediaConfig = MediaConfig.SEND_AUDIO
+ * )
  * ```
  *
- * @param signaling Signaling adapter for SDP exchange (e.g. [WhipSignalingAdapter])
+ * @param signaling Signaling adapter for SDP exchange
  * @param audioConfig Audio capture and processing configuration
  * @param retryConfig Retry configuration for auto-reconnect
  */
+@Deprecated(
+    message = "Use WebRTCSession with MediaConfig.SEND_AUDIO instead. WhipSession will be removed in v3.0.",
+    replaceWith = ReplaceWith(
+        "WebRTCSession(signaling, MediaConfig.SEND_AUDIO)",
+        "com.syncrobotic.webrtc.session.WebRTCSession",
+        "com.syncrobotic.webrtc.config.MediaConfig"
+    )
+)
 expect class WhipSession(
     signaling: SignalingAdapter,
     audioConfig: AudioPushConfig = AudioPushConfig(),
