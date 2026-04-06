@@ -5,6 +5,7 @@ on:
     branches: [ main, dev ]
   pull_request:
     branches: [ main, dev ]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -40,8 +41,13 @@ jobs:
       - name: Build iOS framework
         run: ./gradlew linkPodReleaseFrameworkIosArm64
 
-      - name: Run tests
+      # Level 1: Unit Tests + E2E (MockWhepWhipServer)
+      - name: Run Level 1 tests
         run: ./gradlew jvmTest
+
+      # Level 2: Testcontainers MediaMTX (Docker is pre-installed on macos-latest)
+      - name: Run Level 2 tests (Testcontainers MediaMTX)
+        run: ./gradlew jvmTest --tests "com.syncrobotic.webrtc.e2e.MediaMTX*" --no-build-cache
 
       - name: Test summary
         if: always()
@@ -61,6 +67,32 @@ jobs:
             echo "📊 Tests: $TESTS | ✅ Passed: $PASSED | ❌ Failed: $FAILURES | 🚨 Errors: $ERRORS | ⏭️ Skipped: $SKIPPED"
           else
             echo "⚠️ No test results found at $XML_DIR"
+          fi
+
+      # Coverage report (printed to summary, not uploaded)
+      - name: Coverage report
+        if: always()
+        run: |
+          ./gradlew koverXmlReport || true
+          REPORT="build/reports/kover/report.xml"
+          if [ -f "$REPORT" ]; then
+            INSTRUCTION=$(grep -o 'type="INSTRUCTION"[^/]*' "$REPORT" | head -1)
+            MISSED=$(echo "$INSTRUCTION" | grep -o 'missed="[0-9]*"' | grep -o '[0-9]*')
+            COVERED=$(echo "$INSTRUCTION" | grep -o 'covered="[0-9]*"' | grep -o '[0-9]*')
+            if [ -n "$MISSED" ] && [ -n "$COVERED" ]; then
+              TOTAL=$((MISSED + COVERED))
+              if [ "$TOTAL" -gt 0 ]; then
+                PCT=$((COVERED * 100 / TOTAL))
+                echo "## Coverage" >> "$GITHUB_STEP_SUMMARY"
+                echo "| Covered | Missed | Total | Coverage |" >> "$GITHUB_STEP_SUMMARY"
+                echo "|---------|--------|-------|----------|" >> "$GITHUB_STEP_SUMMARY"
+                echo "| $COVERED | $MISSED | $TOTAL | **${PCT}%** |" >> "$GITHUB_STEP_SUMMARY"
+                echo ""
+                echo "📈 Coverage: ${PCT}% ($COVERED / $TOTAL instructions)"
+              fi
+            fi
+          else
+            echo "⚠️ No coverage report found"
           fi
 
       - name: Upload test results
