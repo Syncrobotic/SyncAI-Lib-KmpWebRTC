@@ -106,6 +106,11 @@ kotlin {
                 implementation(webrtcLibs.ktor.server.core)
                 implementation(webrtcLibs.ktor.server.netty)
                 implementation(webrtcLibs.ktor.server.content.negotiation)
+                implementation(webrtcLibs.ktor.server.websockets)
+
+                // E2E: Testcontainers for MediaMTX Docker
+                implementation(webrtcLibs.testcontainers)
+                implementation(webrtcLibs.testcontainers.junit)
             }
         }
         
