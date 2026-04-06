@@ -32,12 +32,6 @@ jobs:
       - name: Build Android target
         run: ./gradlew bundleReleaseAar
 
-      - name: Build JS target
-        run: ./gradlew jsJar
-
-      - name: Build WasmJS target
-        run: ./gradlew wasmJsJar
-
       - name: Build iOS framework
         run: ./gradlew linkPodReleaseFrameworkIosArm64
 
