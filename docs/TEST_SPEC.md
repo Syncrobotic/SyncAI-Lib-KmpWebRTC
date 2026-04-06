@@ -258,13 +258,35 @@ ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negoti
 | E2E-D-03 | Send binary data | Any | Binary data delivered |
 | E2E-D-04 | Channel close | Any | State = CLOSED |
 
+### E2E-6: Multi-Session Parallel
+
+| ID | Test | Description | Expected |
+|----|------|-------------|----------|
+| E2E-M-01 | Video + Audio sessions parallel | `RECEIVE_VIDEO` session + `SEND_AUDIO` session simultaneously | Both sessions Connected, no interference |
+| E2E-M-02 | Two video sessions parallel | Two `RECEIVE_VIDEO` sessions to different endpoints | Both display video independently |
+| E2E-M-03 | Close one, other continues | Close video session while audio session active | Audio session unaffected |
+
+### E2E-7: Public Callback APIs
+
+| ID | Test | Description | Expected |
+|----|------|-------------|----------|
+| E2E-CB-01 | `onRemoteVideoFrame` fires | Set callback before connect, `RECEIVE_VIDEO` | Callback invoked with platform video frame |
+| E2E-CB-02 | `onLocalVideoTrack` fires | Set callback before connect, `SEND_VIDEO` | Callback invoked with platform video track |
+| E2E-CB-03 | Callback without composable | Use only callbacks, no VideoRenderer | Frames received, no UI needed |
+
 ---
 
 ## Server Architecture Tests
 
 > These tests validate the library works with different backend architectures.
+> Each section includes an architecture diagram for clarity.
 
-### S-1: MediaMTX Server
+### S-1: MediaMTX Server (Direct Connection)
+
+```
+App ═══ WHEP/WHIP (HTTP) ═══ MediaMTX Server
+  (Library)                    (Media + Signaling)
+```
 
 | ID | Test | Description | Expected |
 |----|------|-------------|----------|
@@ -274,28 +296,79 @@ ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negoti
 | S1-04 | Multiple viewers | 2+ apps connect WHEP to same stream | All receive video |
 | S1-05 | Reconnect on server restart | MediaMTX restarts during session | App auto-reconnects |
 
-### S-2: Custom Signaling Server without Media Server
+### S-2: BE Signaling Proxy + IoT WebRTC Server
+
+> BE 不含 media server，只做 signaling proxy (SDP 轉發)。IoT 裝置自帶 WebRTC server (MediaMTX/Pion 等)。
+> 媒體（RTP）走 App ↔ IoT 直連，不經過 BE。
+
+```
+App ─── HTTP (SDP) ───→ BE (Proxy) ─── HTTP (SDP) ───→ IoT (MediaMTX)
+  ║                                                        ║
+  ╚════════════════ RTP 直連 (P2P) ════════════════════════╝
+```
 
 | ID | Test | Description | Expected |
 |----|------|-------------|----------|
-| S2-01 | BE as signaling proxy | App → BE → IoT (MediaMTX) | Video plays, BE only touches SDP |
-| S2-02 | Auth via BE | App sends JWT to BE, BE validates | Authorized apps connect |
-| S2-03 | BE returns 502 | IoT offline, BE returns error | App retries via RetryConfig |
+| S2-01 | Signaling proxy basic | App → BE → IoT (MediaMTX)，BE 只轉發 SDP | Video plays, BE 不碰 RTP |
+| S2-02 | Auth via BE | App sends JWT to BE, BE validates before proxying | Authorized apps connect |
+| S2-03 | IoT offline (502) | IoT 無回應，BE returns 502 | App retries via RetryConfig |
+| S2-04 | IoT reconnect | IoT 重啟後恢復，BE 可再次 proxy | App auto-reconnects successfully |
+| S2-05 | Multiple IoT devices | BE routes to different IoT based on device ID | Each app connects to correct IoT |
+| S2-06 | Video receive + audio send | App receives video (WHEP) + sends audio (WHIP) via BE proxy | 語音對講場景 work |
 
-### S-3: Custom Signaling Server with Media Server
+### S-3: BE with Media Server (SFU/Relay)
+
+> BE 包含 media server，IoT 推一份到 BE，BE 負責分發給 N 個觀看者。
+> 適合觀看者眾多、IoT 資源受限的場景。
+
+```
+IoT ═══ WHIP ═══→ BE (Media Server/SFU) ═══ WHEP ═══→ App 1
+                                          ═══ WHEP ═══→ App 2
+                                          ═══ WHEP ═══→ App N
+```
 
 | ID | Test | Description | Expected |
 |----|------|-------------|----------|
-| S3-01 | BE with media relay | IoT → WHIP → BE (SFU) → WHEP → App | Video plays through relay |
-| S3-02 | 1-to-N via relay | 1 publisher, N viewers through BE | All viewers receive |
+| S3-01 | BE media relay basic | IoT → WHIP → BE (SFU) → WHEP → App | Video plays through relay |
+| S3-02 | 1-to-N via relay | 1 IoT publisher, 3 app viewers through BE | All viewers receive video |
+| S3-03 | Publisher disconnect | IoT 斷線，viewers 收到 error | Viewers 顯示 reconnecting/error |
+| S3-04 | Viewer doesn't affect publisher | Viewer 離開/加入 | Publisher 連線不受影響 |
 
-### S-4: Custom Signaling Server with P2P Mesh
+### S-4: P2P via WebSocket Signaling
+
+> BE 只做 WebSocket 信令轉發（SDP + ICE candidates），不碰媒體。
+> 媒體走 P2P 直連。**需要自訂 `SignalingAdapter`（WebSocket 實作）**。
+
+```
+App A ─── WebSocket ───→ BE (WS Server) ←─── WebSocket ─── App B
+  ║                      (只轉發 SDP)                        ║
+  ╚══════════════════ RTP 直連 (P2P) ════════════════════════╝
+```
 
 | ID | Test | Description | Expected |
 |----|------|-------------|----------|
 | S4-01 | WebSocket signaling | Custom `SignalingAdapter` via WebSocket | P2P connection established |
 | S4-02 | P2P video call | Two apps, WS signaling, direct RTP | Both send/receive video |
-| S4-03 | STUN/TURN traversal | Apps behind NAT, TURN server configured | Connection via relay |
+| S4-03 | STUN traversal | Apps on different LAN, STUN configured | NAT traversal, P2P works |
+| S4-04 | TURN fallback | Apps behind symmetric NAT, TURN configured | Connection via TURN relay |
+| S4-05 | P2P with DataChannel | WS signaling + DataChannel messaging | SDP exchange + data messages both work |
+
+### S-5: IoT WebRTC Server + BE Signaling + DataChannel
+
+> IoT 自帶輕量 WebRTC server（只處理 DataChannel，不處理影像）。
+> 影像走 MediaMTX，指令走獨立的 DataChannel session。
+
+```
+App ═══ WHEP ═══════════════════════════════ IoT (MediaMTX, port 8889)
+App ═══ DataChannel (WHIP) ═════════════════ IoT (DC Server, port 8890)
+  └── signaling 可經過 BE proxy 或直連
+```
+
+| ID | Test | Description | Expected |
+|----|------|-------------|----------|
+| S5-01 | Video + DataChannel 分離 | Video session (WHEP) + DataChannel session (WHIP) 各自獨立 | 兩個 session 同時 work |
+| S5-02 | DataChannel 指令送達 | App 送 JSON 指令到 IoT DC server | IoT 收到並回應 |
+| S5-03 | 經 BE proxy | 兩個 session 都經 BE signaling proxy | BE 轉發 SDP，媒體/DC 直連 IoT |
 
 ---
 
@@ -308,6 +381,8 @@ ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negoti
 | C1-01 | Video call | Both apps use `MediaConfig.VIDEO_CALL` | Both send/receive video + audio |
 | C1-02 | Audio intercom | Both use `MediaConfig.BIDIRECTIONAL_AUDIO` | Both send/receive audio |
 | C1-03 | Camera switch | One app calls `switchCamera()` | Video switches, remote sees new camera |
+| C1-04 | Video + DataChannel | Video call + DataChannel 指令同時進行 | 影像和資料訊息互不干擾 |
+| C1-05 | Media controls during call | `setMuted()`, `setVideoEnabled()` during active call | Media toggles work, remote side sees changes |
 
 ### C-2: Library App + External WebRTC IoT Device
 
@@ -316,6 +391,8 @@ ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negoti
 | C2-01 | Receive from IoT camera | IoT runs MediaMTX/Pion, app connects WHEP | Video plays in app |
 | C2-02 | Send audio to IoT | App sends mic via WHIP to IoT | IoT receives audio |
 | C2-03 | DataChannel commands | App sends JSON commands, IoT responds | Bidirectional messaging works |
+| C2-04 | 語音對講 (intercom) | App 收視訊 + 發音訊 to IoT, same or separate sessions | Video receive + audio send 同時 work |
+| C2-05 | IoT 不同 WebRTC 套件 | IoT 用 Pion/GStreamer/aiortc (非 MediaMTX) | Library 相容標準 WHEP/WHIP 協議 |
 
 ### C-3: Multiple VideoRenderer Support
 
@@ -324,14 +401,16 @@ ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negoti
 | C3-01 | 2 video sessions | Two `WebRTCSession` + `VideoRenderer` | Both display video |
 | C3-02 | 4 video sessions | Grid layout with 4 streams | All display, performance acceptable |
 | C3-03 | Independent lifecycle | Close one session, other continues | No interference |
+| C3-04 | Different MediaConfig per session | One RECEIVE_VIDEO, one VIDEO_CALL | Each behaves according to its config |
 
 ### C-4: 1-to-N Connection
 
 | ID | Test | Description | Expected |
 |----|------|-------------|----------|
-| C4-01 | 3 viewers, 1 publisher | 1 WHIP publisher, 3 WHEP viewers | All viewers see video |
-| C4-02 | Viewer joins late | Publisher already streaming, new viewer connects | Viewer gets video |
+| C4-01 | 3 viewers, 1 publisher | 1 WHIP publisher, 3 WHEP viewers via MediaMTX | All viewers see video |
+| C4-02 | Viewer joins late | Publisher already streaming, new viewer connects | Viewer gets video immediately |
 | C4-03 | Viewer leaves | One viewer disconnects | Others unaffected |
+| C4-04 | Publisher reconnect | Publisher 斷線重連 | Viewers auto-reconnect after publisher recovers |
 
 ### C-5: DataChannel Communication
 
@@ -341,6 +420,7 @@ ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negoti
 | C5-02 | Binary messaging | Send/receive binary data (images) | Data delivered intact |
 | C5-03 | Multiple channels | Create 2+ DataChannels on same session | All channels work independently |
 | C5-04 | Channel with video | DataChannel + video receive on same session | Both work simultaneously |
+| C5-05 | High-frequency messaging | Rapid DataChannel messages (10+ msgs/sec) | All delivered, no loss in reliable mode |
 
 ---
 
@@ -352,10 +432,10 @@ ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negoti
 | **Unit Tests** (HttpSignalingAdapter) | 13 | Automated (MockEngine) | ✅ Implemented |
 | **Unit Tests** (MediaConfig, TransceiverDirection, VideoCaptureConfig) | 25 | Automated | ✅ Implemented |
 | **Unit Tests** (SignalingException) | 4 | Automated | ✅ Implemented |
-| **Library E2E** | ~14 | Semi-automated (requires server) | To implement |
-| **Server Architecture** | ~10 | Manual | To implement |
-| **Client Architecture** | ~14 | Manual | To implement |
-| **Total** | **~111** | | |
+| **Library E2E** | ~20 | Semi-automated (requires server) | To implement |
+| **Server Architecture** | ~22 | Manual | To implement |
+| **Client Architecture** | ~22 | Manual | To implement |
+| **Total** | **~151** | | |
 
 ### Running Tests
 
