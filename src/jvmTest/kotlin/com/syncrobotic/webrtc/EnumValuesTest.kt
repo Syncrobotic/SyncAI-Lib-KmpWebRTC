@@ -1,7 +1,7 @@
 package com.syncrobotic.webrtc
 
 import com.syncrobotic.webrtc.datachannel.DataChannelState
-import com.syncrobotic.webrtc.signaling.WhipErrorCode
+import com.syncrobotic.webrtc.signaling.SignalingErrorCode
 import kotlin.test.*
 
 /**
@@ -84,13 +84,13 @@ class EnumValuesTest {
     }
 
     @Test
-    fun `EV-09 WhipErrorCode entries`() {
-        val entries = WhipErrorCode.entries
+    fun `EV-09 SignalingErrorCode entries`() {
+        val entries = SignalingErrorCode.entries
         assertEquals(5, entries.size)
-        assertTrue(entries.contains(WhipErrorCode.NETWORK_ERROR))
-        assertTrue(entries.contains(WhipErrorCode.OFFER_REJECTED))
-        assertTrue(entries.contains(WhipErrorCode.ICE_CANDIDATE_FAILED))
-        assertTrue(entries.contains(WhipErrorCode.SESSION_TERMINATED))
-        assertTrue(entries.contains(WhipErrorCode.UNKNOWN))
+        assertTrue(entries.contains(SignalingErrorCode.NETWORK_ERROR))
+        assertTrue(entries.contains(SignalingErrorCode.OFFER_REJECTED))
+        assertTrue(entries.contains(SignalingErrorCode.ICE_CANDIDATE_FAILED))
+        assertTrue(entries.contains(SignalingErrorCode.SESSION_TERMINATED))
+        assertTrue(entries.contains(SignalingErrorCode.UNKNOWN))
     }
 }

@@ -1,8 +1,8 @@
 # SyncAI-Lib-KmpWebRTC SDK Roadmap
 
-> Created: 2026-03-26
-> Last Updated: 2026-04-06
-> Status: v2.0 Complete — Unified WebRTCSession API
+> Created: 2026-03-26  
+> Last Updated: 2026-04-06  
+> Status: v2.0 Complete — Unified WebRTCSession API  
 
 ---
 
