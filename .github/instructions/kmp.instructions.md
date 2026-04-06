@@ -13,8 +13,7 @@ applyTo: "src/**/*.kt"
 ## Compose Multiplatform
 
 - UI components use `@Composable` functions that return Controller objects for external control
-- v2 pattern: `VideoRenderer(session) → VideoPlayerController` (Session-based, not config-based)
-- Legacy pattern (deprecated): `VideoRenderer(config) → VideoPlayerController`
+- Pattern: `VideoRenderer(session: WebRTCSession)`, `CameraPreview(session: WebRTCSession)`, `AudioPushPlayer(session: WebRTCSession)`
 - Platform-specific Composables use `expect`/`actual` fun
 
 ## Source Set Dependencies
@@ -23,18 +22,18 @@ applyTo: "src/**/*.kt"
 - `androidMain`: Can use Android SDK, ExoPlayer, `webrtcLibs.webrtc.android`
 - `iosMain`: Uses GoogleWebRTC via CocoaPods (`cocoapods { pod("GoogleWebRTC") }`)
 - `jvmMain`: Uses `webrtcLibs.webrtc.java` + platform native JARs
-- `jsMain`: Uses browser native APIs (`external` declarations)
+- `jsMain`: Uses browser native APIs (`external` declarations) — partial stub
 - New dependencies must be defined in `gradle/libs.versions.toml` and referenced in `build.gradle.kts` as `webrtcLibs.xxx`
 
 ## State Management
 
 - Use `StateFlow` to expose state changes
-- State classes use `sealed class` (e.g. `PlayerState`, `AudioPushState`, `WebRTCState`)
+- State classes use `sealed class` (e.g. `SessionState`, `PlayerState`, `AudioPushState`, `WebRTCState`)
 - Asynchronous operations use Kotlin Coroutines
 
 ## Interface Design
 
 - Follow interface segregation principle: each interface has a single responsibility, small and focused
 - Existing examples: `SignalingAdapter` (SDP exchange), `VideoPlayerController` (playback control), `AudioPushController` (audio push), `DataChannelListener` (data channel events)
-- v2 core types: `WhepSession` (receive), `WhipSession` (send), `SignalingAuth` (authentication)
+- Core types: `WebRTCSession` (unified session with `MediaConfig`), `HttpSignalingAdapter` (WHEP/WHIP), `SignalingAuth` (authentication)
 - When adding new interfaces, avoid monolithic designs; prefer splitting into multiple small interfaces

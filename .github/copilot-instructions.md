@@ -2,14 +2,14 @@
 
 ## Overview
 
-SyncAI-Lib-KmpWebRTC is a Kotlin Multiplatform WebRTC client library supporting Android, iOS, JVM, JS, and WasmJS platforms. It provides video/audio stream receiving (WHEP), audio sending (WHIP), and DataChannel bidirectional communication.
+SyncAI-Lib-KmpWebRTC is a Kotlin Multiplatform WebRTC client library supporting Android, iOS, JVM platforms (JS and WasmJS are partial stubs). It provides video/audio stream receiving (WHEP), audio/video sending (WHIP), bidirectional media, and DataChannel communication via a unified `WebRTCSession` API.
 
 ## Architecture
 
 - **Single-module KMP structure**: All code resides in a single Gradle module
 - **expect/actual pattern**: Shared interfaces defined in `src/commonMain/`, each platform provides `actual` implementations in corresponding source sets
-- **Compose Multiplatform**: UI components use Compose (`VideoRenderer`, `AudioPushPlayer`); `BidirectionalPlayer` is deprecated
-- **Three-layer architecture**: Layer 1 (SignalingAdapter) → Layer 2 (WhepSession/WhipSession) → Layer 3 (Composables)
+- **Compose Multiplatform**: UI components use Compose (`VideoRenderer`, `CameraPreview`, `AudioPushPlayer`)
+- **Three-layer architecture**: Layer 1 (`HttpSignalingAdapter` / custom `SignalingAdapter`) → Layer 2 (`WebRTCSession` with `MediaConfig`) → Layer 3 (Composables)
 - **Package**: `com.syncrobotic.webrtc` (sub-packages: `config`, `signaling`, `session`, `audio`, `ui`, `datachannel`)
 
 ### Source Set Structure
@@ -20,8 +20,8 @@ SyncAI-Lib-KmpWebRTC is a Kotlin Multiplatform WebRTC client library supporting 
 | `androidMain` | Android | Google WebRTC SDK + ExoPlayer |
 | `iosMain` | iOS | GoogleWebRTC CocoaPod |
 | `jvmMain` | Desktop | webrtc-java |
-| `jsMain` | Browser | Native RTCPeerConnection (partial stub) |
-| `wasmJsMain` | Browser | Native RTCPeerConnection (incomplete) |
+| `jsMain` | Browser | Partial stub (not production-ready) |
+| `wasmJsMain` | Browser | Incomplete stub |
 
 ## Code Style
 
@@ -34,10 +34,9 @@ SyncAI-Lib-KmpWebRTC is a Kotlin Multiplatform WebRTC client library supporting 
 
 ## Docs Reference
 
-Project architecture and specification documents are stored in the `docs/` directory. Verify generated code conforms to design principles before committing:
-- [docs/README_V2.md](../docs/README_V2.md): v2 API design and usage examples
-- [docs/MIGRATION_PLAN.md](../docs/MIGRATION_PLAN.md): v1 → v2 migration phases and checklist
+Project architecture and specification documents are stored in the `docs/` directory:
 - [docs/ROADMAP.md](../docs/ROADMAP.md): Feature planning and milestones
+- [docs/TEST_SPEC.md](../docs/TEST_SPEC.md): Test specification with implementation status and execution guide
 
 ## Code Review Checklist
 
@@ -46,8 +45,8 @@ When generating or modifying code, ask yourself:
 - [ ] Are performance and resource cleanup considered (PeerConnection, Factory, EglBase)?
 - [ ] Is the interface segregation principle maintained (small, focused interfaces)?
 - [ ] Are new dependencies introduced? If so, they must be added to `gradle/libs.versions.toml`
-- [ ] Does error handling use sealed class states (e.g. `PlayerState.Error`)?
-- [ ] Does new signaling code use `SignalingAdapter` interface (not legacy `WhepSignaling`/`WhipSignaling`)?
+- [ ] Does error handling use sealed class states (e.g. `SessionState.Error`, `PlayerState.Error`)?
+- [ ] Does new signaling code use `SignalingAdapter` interface with `HttpSignalingAdapter`?
 - [ ] Could this break existing platform actual implementations?
 
 ## Commit Rules
@@ -56,12 +55,12 @@ Commit messages must be in English, following Conventional Commits (release-plea
 
 | Type | Prefix | Example |
 |------|--------|--------|
-| New feature | `feat:` | `feat: add VideoPushPlayer composable` |
+| New feature | `feat:` | `feat: add DataChannel support` |
 | Bug fix | `fix:` | `fix: resolve EglContext conflict on multi-renderer` |
 | Optimization | `perf:` | `perf: reduce memory usage in JVM video decoding` |
-| Test | `test:` | `test: add WebRTCConfig unit tests` |
-| Documentation | `docs:` | `docs: update ROADMAP phase 1 status` |
-| Refactor | `refactor:` | `refactor: extract signaling interface` |
+| Test | `test:` | `test: add E2E bidirectional audio tests` |
+| Documentation | `docs:` | `docs: update TEST_SPEC with coverage report` |
+| Refactor | `refactor:` | `refactor: unify session API with MediaConfig` |
 
 ## Build and Test
 
@@ -72,12 +71,14 @@ Commit messages must be in English, following Conventional Commits (release-plea
 # Build specific targets
 ./gradlew jvmMainClasses          # JVM
 ./gradlew bundleReleaseAar        # Android AAR
-./gradlew jsJar                   # JavaScript
-./gradlew wasmJsJar               # WebAssembly
 ./gradlew linkPodReleaseFrameworkIosArm64  # iOS framework
 
 # Run tests
-./gradlew jvmTest
+./gradlew jvmTest                 # Level 1: Unit + E2E (mock server)
+./gradlew jvmTest --tests "*.e2e.MediaMTX*" --no-build-cache  # Level 2: Testcontainers
+
+# Coverage report
+./gradlew koverHtmlReport         # HTML report at build/reports/kover/html/
 
 # Publish to local Maven
 ./gradlew publishToMavenLocal
@@ -89,14 +90,15 @@ Commit messages must be in English, following Conventional Commits (release-plea
 ## Conventions
 
 - **PeerConnectionFactory management**: Android creates a separate Factory per connection (to avoid EglContext conflicts); JVM uses reference counting to share a single Factory
-- **Multi-instance safety**: Multiple `VideoRenderer` / `WebRTCClient` instances can run simultaneously with no shared state conflicts
-- **Signaling**: Uses `SignalingAdapter` interface with built-in `WhepSignalingAdapter`/`WhipSignalingAdapter`; legacy `WhepSignaling`/`WhipSignaling`/`WebSocketSignaling` are `@Deprecated` (will be removed in v3.0)
-- **Version management**: Managed automatically by release-please; version defined in `gradle.properties`
+- **Multi-instance safety**: Multiple `VideoRenderer` / `WebRTCSession` instances can run simultaneously with no shared state conflicts
+- **Signaling**: Uses `SignalingAdapter` interface with built-in `HttpSignalingAdapter` (unified WHEP/WHIP). Custom implementations (e.g. WebSocket) can implement `SignalingAdapter` directly
+- **Authentication**: `SignalingAuth` sealed interface — `Bearer(token)`, `Cookies(map)`, `CookieStorage(storage)`, `Custom(headers)`, `None`
+- **Error handling**: Signaling errors use `SignalingException` with `SignalingErrorCode` enum (`OFFER_REJECTED`, `ICE_CANDIDATE_FAILED`, `NETWORK_ERROR`, `SESSION_TERMINATED`, `UNKNOWN`). Session errors expressed as `SessionState.Error(message, cause, isRetryable)`
+- **Version management**: Managed automatically by release-please; version passed via `-Pversion=x.y.z`
 - **Dependency definitions**: Uses version catalog `gradle/libs.versions.toml`, referenced in code as `webrtcLibs.xxx`
 - **iOS Simulator**: GoogleWebRTC does not support iOS Simulator; physical device only
-- **Logging**: Currently uses platform-native logging (Android `Log.d`, iOS `NSLog`, JVM `println`); unified Logger abstraction planned (see ROADMAP Phase 2)
-- **Error handling**: Uses sealed class states for errors (`PlayerState.Error`, `AudioPushState.Error`); Signaling layer uses custom Exceptions (`WhepException`, `WhipException` with `WhipErrorCode`)
-- **Deprecated types (v2 migration)**: `AudioRetryConfig` (use `RetryConfig`), `StreamProtocol`, `StreamDirection`, `SignalingType`, `WebSocketSignalingConfig`, `ServerEndpoints`, `BidirectionalConfig`, and `WebRTCConfig.signalingType/wsConfig/whepEnabled/whipEnabled` — all marked `@Deprecated`, will be removed in v3.0
+- **Logging**: Currently uses platform-native logging (Android `Log.d`, iOS `NSLog`, JVM `println`)
+- **Removed v1.x APIs**: `WhepSession`, `WhipSession`, `WhepSignalingAdapter`, `WhipSignalingAdapter`, `WhepSignaling`, `WhipSignaling`, `WebSocketSignaling`, `BidirectionalConfig`, `WhepException`, `WhipException` — all removed in v2.0, do NOT reference them
 
 ## Key Dependencies
 
@@ -108,6 +110,8 @@ Commit messages must be in English, following Conventional Commits (release-plea
 | webrtc-android (io.github.webrtc-sdk) | Android WebRTC |
 | webrtc-java (dev.onvoid.webrtc) | Desktop WebRTC |
 | GoogleWebRTC CocoaPod 1.1.31999 | iOS WebRTC |
+| Testcontainers 1.21.1 | Docker-based integration tests |
+| Kover 0.9.1 | Test coverage reporting |
 
 ## Roadmap
 
