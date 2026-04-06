@@ -776,46 +776,39 @@ HTML 報告應顯示：
 
 ### Level 2: Testcontainers MediaMTX Integration
 
-> **前提條件**: Docker Desktop 已安裝並啟動
-> **預計耗時**: 首次 ~2 分鐘（拉 image），之後 ~30 秒
+> **前提條件**: Docker runtime（Colima 或 Docker Desktop）已安裝並啟動
+> **預計耗時**: 首次 ~30 秒（拉 image），之後 ~5 秒
 
-#### 已知限制
+#### Step 0 — 安裝 Docker runtime
 
-> **Docker Desktop 29.x 相容性問題**：Testcontainers 1.21.x 使用 docker-java 3.4.x，
-> 其 Docker API client version (1.32) 低於 Docker Engine 29+ 的最低要求 (1.44)，
-> 導致測試被 skip。此為上游問題 ([testcontainers/testcontainers-java#9925](https://github.com/testcontainers/testcontainers-java/issues/9925))。
->
-> **解法**（擇一）：
-> 1. 使用 Docker Desktop **v27.x** 或 **v28.x**（支援 API 1.32）
-> 2. 等待 Testcontainers 升級 docker-java 至 3.5+（已在進行中）
-> 3. 在 CI 環境中使用 Docker Engine 28.x
-
-#### Step 0 — 確認 Docker 可用
+macOS 推薦使用 **Colima**（輕量 Docker runtime），避免 Docker Desktop 授權問題：
 
 ```bash
-docker info
-# 應顯示 Docker 版本資訊，不是 error
+# 安裝 Colima + Docker CLI
+brew install colima docker
 
-# 確認 Docker API 相容性
-docker version --format '{{.Server.MinAPIVersion}}'
-# 如果輸出 >= 1.44，代表需要 Docker Desktop 28.x 或更舊版本才能跑 Testcontainers
+# 啟動 Colima
+colima start
+
+# 確認 Docker 可用
+docker info
+# 應顯示 Server Version 和 Operating System
 ```
 
-如果沒有 Docker：
-1. 下載 [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/)
-2. 安裝並啟動（menu bar 出現 🐳 圖示）
-3. 等待 `docker info` 正常回應
+> **也可以用 Docker Desktop**，但需注意 Docker Engine 29+ 的 API 相容性問題（見下方說明）。
 
 #### Step 1 — 執行 MediaMTX 測試
 
 ```bash
-./gradlew jvmTest --tests "com.syncrobotic.webrtc.e2e.MediaMTX*"
+./gradlew jvmTest --tests "com.syncrobotic.webrtc.e2e.MediaMTX*" --no-build-cache
 ```
 
+> **注意**：首次執行或 Docker 環境變更後，建議加 `--no-build-cache` 避免使用舊的 skip 結果。
+
 首次執行時，Testcontainers 會自動：
-1. 拉取 `bluenviron/mediamtx:latest` Docker image
+1. 拉取 `testcontainers/ryuk` 和 `bluenviron/mediamtx:latest` Docker images
 2. 啟動 MediaMTX container（暴露 RTSP 8554 + WebRTC 8889）
-3. 等待 server ready（log 偵測 "listener opened"）
+3. 等待 port ready
 4. 執行 8 個 integration tests
 5. 自動停止並清理 container
 
@@ -825,17 +818,51 @@ docker version --format '{{.Server.MinAPIVersion}}'
 BUILD SUCCESSFUL
 ```
 
-測試報告：`build/reports/tests/jvmTest/index.html`
-搜尋 `MediaMTXIntegrationTest` 確認 8 tests passed。
+確認測試實際執行（非 skip）：
+
+```bash
+# 查看 XML 報告
+head -2 build/test-results/jvmTest/TEST-com.syncrobotic.webrtc.e2e.MediaMTXIntegrationTest.xml
+# 應顯示: tests="8" skipped="0" failures="0" errors="0"
+```
+
+或打開 HTML 報告：`build/reports/tests/jvmTest/index.html`，搜尋 `MediaMTXIntegrationTest` 確認 8 tests passed。
+
+#### Step 3 — 測試結束後關閉 Docker
+
+```bash
+# 查看是否有殘留 container（正常應為空）
+docker ps
+
+# 關閉 Colima（停止 Docker Engine + VM）
+colima stop
+
+# 確認已關閉
+colima status
+# 應顯示: colima is not running
+```
 
 #### Docker 不可用時的行為
 
 | Docker 狀態 | 測試結果 |
 |-------------|---------|
 | Docker 未安裝 | 8 tests **skipped** (不算 failure) |
-| Docker 未啟動 | 8 tests **skipped** |
-| Docker 啟動但 pull 失敗 | 8 tests **skipped** |
-| Docker 正常運行 | 8 tests **executed** |
+| Colima / Docker Desktop 未啟動 | 8 tests **skipped** |
+| Docker 啟動但 image pull 失敗（無網路） | 8 tests **skipped** |
+| Docker 正常運行（Colima 或 Docker Desktop） | 8 tests **executed** |
+
+#### Docker Engine 29+ API 相容性
+
+> Testcontainers 1.21.x 使用 docker-java 3.4.x，預設 Docker API version 1.32。
+> Docker Engine 29+ 最低要求 API 1.44。
+>
+> **已解決**：`build.gradle.kts` 設定 `systemProperty("api.version", "1.44")` 強制使用新版 API。
+> 同時自動偵測 Colima socket 路徑 (`~/.colima/default/docker.sock`)。
+>
+> 如果仍遇到 `client version 1.32 is too old` 錯誤，確認：
+> 1. `build.gradle.kts` 中 `tasks.withType<Test>()` 區塊存在 `api.version` 設定
+> 2. 使用 `--no-build-cache` 清除舊的 cache 結果
+> 3. 執行 `./gradlew --stop` 重啟 Gradle daemon
 
 ---
 
