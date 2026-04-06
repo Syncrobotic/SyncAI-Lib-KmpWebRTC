@@ -348,9 +348,10 @@ ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negoti
 
 | Category | Test Count | Automation | Status |
 |----------|-----------|------------|--------|
-| **Unit Tests** (Config, State, Models) | ~45 | Automated (`./gradlew jvmTest`) | Partial (existing tests) |
-| **Unit Tests** (HttpSignalingAdapter) | ~13 | Automated (MockEngine) | To implement |
-| **Unit Tests** (MediaConfig, TransceiverDirection) | ~15 | Automated | To implement |
+| **Unit Tests** (Config, State, Models) | ~45 | Automated (`./gradlew jvmTest`) | ✅ Implemented |
+| **Unit Tests** (HttpSignalingAdapter) | 13 | Automated (MockEngine) | ✅ Implemented |
+| **Unit Tests** (MediaConfig, TransceiverDirection, VideoCaptureConfig) | 25 | Automated | ✅ Implemented |
+| **Unit Tests** (SignalingException) | 4 | Automated | ✅ Implemented |
 | **Library E2E** | ~14 | Semi-automated (requires server) | To implement |
 | **Server Architecture** | ~10 | Manual | To implement |
 | **Client Architecture** | ~14 | Manual | To implement |
