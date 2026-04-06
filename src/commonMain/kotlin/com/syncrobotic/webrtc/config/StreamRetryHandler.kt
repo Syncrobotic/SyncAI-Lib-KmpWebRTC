@@ -1,7 +1,6 @@
 package com.syncrobotic.webrtc.config
 
-import com.syncrobotic.webrtc.signaling.WebSocketSignalingException
-import com.syncrobotic.webrtc.signaling.WhepException
+import com.syncrobotic.webrtc.signaling.SignalingException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
@@ -87,8 +86,7 @@ object StreamRetryHandler {
             is IllegalArgumentException -> false
             is UnsupportedOperationException -> false
             is NotImplementedError -> false
-            is WhepException -> true
-            is WebSocketSignalingException -> true
+            is SignalingException -> true
             is StreamRetryExhaustedException -> false
             else -> true
         }

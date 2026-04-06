@@ -1,7 +1,5 @@
 package com.syncrobotic.webrtc
 
-import com.syncrobotic.webrtc.config.SignalingType
-import com.syncrobotic.webrtc.config.StreamProtocol
 import com.syncrobotic.webrtc.datachannel.DataChannelState
 import com.syncrobotic.webrtc.signaling.WhipErrorCode
 import kotlin.test.*
@@ -73,23 +71,6 @@ class EnumValuesTest {
         assertEquals(2, entries.size)
         assertTrue(entries.contains(TrackKind.VIDEO))
         assertTrue(entries.contains(TrackKind.AUDIO))
-    }
-
-    @Test
-    fun `EV-06 StreamProtocol entries`() {
-        val entries = StreamProtocol.entries
-        assertEquals(3, entries.size)
-        assertTrue(entries.contains(StreamProtocol.RTSP))
-        assertTrue(entries.contains(StreamProtocol.HLS))
-        assertTrue(entries.contains(StreamProtocol.WEBRTC))
-    }
-
-    @Test
-    fun `EV-07 SignalingType entries`() {
-        val entries = SignalingType.entries
-        assertEquals(2, entries.size)
-        assertTrue(entries.contains(SignalingType.WHEP_HTTP))
-        assertTrue(entries.contains(SignalingType.WEBSOCKET))
     }
 
     @Test

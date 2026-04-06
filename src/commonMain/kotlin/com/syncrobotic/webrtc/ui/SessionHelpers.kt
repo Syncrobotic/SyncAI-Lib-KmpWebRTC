@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.syncrobotic.webrtc.session.SessionState
 import com.syncrobotic.webrtc.session.WebRTCSession
-import com.syncrobotic.webrtc.session.WhepSession
 
 /**
  * Maps [SessionState] to [PlayerState].
@@ -35,34 +34,6 @@ internal fun SessionState.toPlayerState(): PlayerState = when (this) {
     )
     is SessionState.Error -> PlayerState.Error(message = message, cause = cause)
     SessionState.Closed -> PlayerState.Stopped
-}
-
-/**
- * A [VideoPlayerController] backed by a [WhepSession].
- */
-internal class SessionVideoPlayerController(
-    private val session: WhepSession
-) : VideoPlayerController {
-    override fun play() {
-        session.setAudioEnabled(true)
-    }
-
-    override fun pause() {
-        session.setAudioEnabled(false)
-    }
-
-    override fun stop() {
-        session.close()
-    }
-
-    override fun seekTo(positionMs: Long) {
-        // Not supported for live WebRTC streams
-    }
-
-    override val currentPosition: Long get() = 0L
-    override val duration: Long get() = 0L
-    override val isPlaying: Boolean
-        get() = session.state.value == SessionState.Connected
 }
 
 /**
@@ -177,7 +148,7 @@ internal fun SessionStatusOverlay(
                 }
                 is SessionState.Error -> {
                     Text(
-                        text = "⚠",
+                        text = "\u26A0",
                         fontSize = 24.sp,
                         color = Color.Red
                     )
