@@ -102,9 +102,13 @@ git checkout -b feat/my-feature
 # Run all Level 1 tests (must pass before PR)
 ./gradlew jvmTest
 
-# Optional: Run Level 2 tests if you have Docker
+# Run Level 2 tests (requires Docker — see "Running Tests" section below)
 ./gradlew jvmTest --tests "com.syncrobotic.webrtc.e2e.MediaMTX*" --no-build-cache
 ```
+
+> **Important:** CI 環境沒有攝影機和麥克風，E2E full WebRTC tests 中涉及 `SEND_VIDEO` / `SEND_AUDIO` 的測試在 CI 上只會驗證 error handling path（session 進入 `Error` state 仍算 pass）。
+> 只有在**本機有硬體的環境**才能測到完整的 `Connected` path。
+> 因此，如果你的改動涉及 media capture、signaling flow 或 session lifecycle，**請務必在本機執行 Level 1 + Level 2 測試**，確保 Connected path 也正確。
 
 ### 3. Push and create PR targeting `dev`
 
