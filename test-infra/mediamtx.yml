@@ -1,0 +1,23 @@
+###############################################
+# MediaMTX Configuration — Default (no auth)
+# Used for: S-1, C-3, C-4 tests
+###############################################
+
+# Log level
+logLevel: info
+
+# RTSP server
+rtsp: yes
+rtspAddress: :8554
+
+# WebRTC server (WHEP/WHIP)
+webrtc: yes
+webrtcAddress: :8889
+
+# API for monitoring
+api: yes
+apiAddress: :9997
+
+# Paths — accept any stream name dynamically
+paths:
+  all_others:

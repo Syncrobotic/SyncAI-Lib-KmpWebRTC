@@ -1,0 +1,91 @@
+###############################################
+# Level 3 Manual Test Infrastructure
+#
+# Usage:
+#   docker compose up -d              # Start all services
+#   docker compose up -d mediamtx     # Start only MediaMTX
+#   docker compose up -d pion-iot     # Start only Pion IoT
+#   docker compose logs -f            # Follow logs
+#   docker compose down               # Stop all
+#
+# Find your LAN IP (for mobile devices):
+#   macOS: ipconfig getifaddr en0
+#   Linux: hostname -I | awk '{print $1}'
+###############################################
+
+services:
+  # ─── MediaMTX (Default, no auth) ────────────────────────
+  # WHEP/WHIP media server + RTSP gateway
+  # Covers: S-1, C-3, C-4
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx
+    ports:
+      - "8554:8554"   # RTSP
+      - "8889:8889"   # WebRTC (WHEP/WHIP)
+      - "9997:9997"   # API
+      - "8890:8890/udp" # WebRTC UDP
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9997/v3/config/global/get"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── MediaMTX (With auth) ───────────────────────────────
+  # Same as above but requires credentials
+  # Covers: S-1 auth tests
+  mediamtx-auth:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx-auth
+    ports:
+      - "8555:8554"   # RTSP (offset port)
+      - "8891:8889"   # WebRTC (offset port)
+      - "9998:9997"   # API (offset port)
+    volumes:
+      - ./mediamtx-auth.yml:/mediamtx.yml
+    restart: unless-stopped
+    profiles:
+      - auth    # Only start with: docker compose --profile auth up -d
+
+  # ─── FFmpeg RTSP Source ─────────────────────────────────
+  # Simulates an IoT camera pushing RTSP test pattern
+  # Covers: S-1b (IoT RTSP -> MediaMTX -> App)
+  ffmpeg-source:
+    image: linuxserver/ffmpeg:latest
+    container_name: ffmpeg-source
+    depends_on:
+      mediamtx:
+        condition: service_healthy
+    entrypoint: >
+      ffmpeg
+        -re
+        -f lavfi -i "testsrc=size=640x480:rate=30:duration=86400"
+        -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=86400"
+        -c:v libx264 -preset ultrafast -tune zerolatency -b:v 1M
+        -c:a aac -b:a 128k
+        -f rtsp rtsp://mediamtx:8554/iot-camera
+    restart: unless-stopped
+
+  # ─── Pion WebRTC IoT Server ─────────────────────────────
+  # Simulates IoT device with WebRTC + DataChannel
+  # Modes: iot (default), sfu, bidirectional
+  # Covers: S-3, S-5, C-1, C-2, C-5
+  pion-iot:
+    build:
+      context: ./pion-iot
+      dockerfile: Dockerfile
+    container_name: pion-iot
+    ports:
+      - "8080:8080"       # HTTP (WHIP/WHEP endpoints)
+      - "3478:3478/udp"   # STUN
+    environment:
+      - PORT=8080
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
