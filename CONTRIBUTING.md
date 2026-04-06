@@ -60,8 +60,8 @@ Platform-specific code uses the **expect/actual** pattern. Shared interfaces are
 - **All comments, documentation, and commit messages must be in English**
 - Use Kotlin Coroutines and `StateFlow` for async operations
 - Use `sealed class` states for error handling (e.g., `SessionState.Error`, `PlayerState.Error`)
-- Use `HttpSignalingAdapter` for WHEP/WHIP — do **not** use legacy `WhepSignaling`/`WhipSignaling`
-- Use `WebRTCSession` with `MediaConfig` — do **not** use legacy `WhepSession`/`WhipSession`
+- Use `HttpSignalingAdapter` for WHEP/WHIP — the legacy `WhepSignalingAdapter`/`WhipSignalingAdapter` from v1.x were removed
+- Use `WebRTCSession` with `MediaConfig` — the legacy `WhepSession`/`WhipSession` from v1.x were removed
 
 ## Commit Convention
 

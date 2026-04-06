@@ -60,13 +60,13 @@ data class MediaConfig(
 
     companion object {
         /**
-         * Receive video + audio (equivalent to legacy WhepSession default).
+         * Receive video + audio (equivalent to v1.x receive-only session).
          * Typical use: watching a stream.
          */
         val RECEIVE_VIDEO = MediaConfig(receiveVideo = true, receiveAudio = true)
 
         /**
-         * Send audio only (equivalent to legacy WhipSession default).
+         * Send audio only (equivalent to v1.x send-only session).
          * Typical use: push microphone to server.
          */
         val SEND_AUDIO = MediaConfig(sendAudio = true)

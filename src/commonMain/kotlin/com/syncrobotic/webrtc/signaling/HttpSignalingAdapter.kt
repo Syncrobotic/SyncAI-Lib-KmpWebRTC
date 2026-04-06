@@ -45,7 +45,7 @@ class SignalingException(
  * 3. **DELETE** to tear down the session
  *
  * Since WHEP and WHIP use the exact same HTTP flow (only the endpoint URL differs),
- * this single adapter replaces both `WhepSignalingAdapter` and `WhipSignalingAdapter`.
+ * a single adapter handles both protocols.
  *
  * ```kotlin
  * // Receiving (WHEP endpoint)
