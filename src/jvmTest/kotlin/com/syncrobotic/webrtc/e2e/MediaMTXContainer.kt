@@ -28,15 +28,11 @@ class MediaMTXContainer(
     init {
         withExposedPorts(RTSP_PORT, WEBRTC_PORT)
         // MediaMTX logs "listener opened" when ready
+        // Wait for WebRTC port to be listening
         waitingFor(
-            Wait.forLogMessage(".*listener opened on :$WEBRTC_PORT.*", 1)
-                .withStartupTimeout(Duration.ofSeconds(30))
+            Wait.forListeningPort()
+                .withStartupTimeout(Duration.ofSeconds(60))
         )
-        // Allow WebRTC and RTSP
-        withEnv("MTX_WEBRTCADDRESS", ":$WEBRTC_PORT")
-        withEnv("MTX_RTSPADDRESS", ":$RTSP_PORT")
-        // Enable all paths by default
-        withEnv("MTX_PATHS_ALL_SOURCE", "publisher")
     }
 
     /** RTSP URL base, e.g. `rtsp://localhost:32771` */

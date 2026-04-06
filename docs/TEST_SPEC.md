@@ -711,13 +711,42 @@ cd VLMWebRTC && ./gradlew :composeApp:run
 | **Client Architecture** (C-1~C-5) | ~22 | Manual | ⬜ To implement | — |
 | **Total** | **~170** | | **120 automated / 50 manual** | |
 
-### Running Tests
+---
+
+## How to Run Tests
+
+### Level 1: Unit Tests + E2E (Mock Server)
+
+> **前提條件**: 無（純 Kotlin + in-process Ktor mock server）
+> **預計耗時**: ~30 秒
+
+#### Step 1 — 執行所有 Level 1 測試
 
 ```bash
-# All automated tests (unit + E2E + Testcontainers)
 ./gradlew jvmTest
+```
 
-# Unit tests only
+#### Step 2 — 確認結果
+
+```
+BUILD SUCCESSFUL
+```
+
+測試報告位置：
+- **HTML**: `build/reports/tests/jvmTest/index.html`（用瀏覽器打開）
+- **XML**: `build/test-results/jvmTest/` (CI 用)
+
+#### Step 3 — 確認測試數量
+
+HTML 報告應顯示：
+- **207 tests**
+- **0 failures**
+- 部分 Full WebRTC tests 可能顯示 **skipped**（正常，需要 native libs 完整支援）
+
+#### 個別執行
+
+```bash
+# 只跑 Unit Tests
 ./gradlew jvmTest --tests "com.syncrobotic.webrtc.config.*" \
                   --tests "com.syncrobotic.webrtc.audio.*" \
                   --tests "com.syncrobotic.webrtc.ui.*" \
@@ -726,16 +755,129 @@ cd VLMWebRTC && ./gradlew :composeApp:run
                   --tests "com.syncrobotic.webrtc.signaling.*" \
                   --tests "com.syncrobotic.webrtc.*Test"
 
-# E2E tests only (Level 1: mock server)
+# 只跑 E2E Tests (signaling + full WebRTC)
 ./gradlew jvmTest --tests "com.syncrobotic.webrtc.e2e.E2E*"
 
-# Testcontainers MediaMTX tests only (Level 2: requires Docker)
+# 只跑特定測試類別
+./gradlew jvmTest --tests "com.syncrobotic.webrtc.e2e.E2E1VideoReceiveTest"
+
+# 只跑特定測試方法
+./gradlew jvmTest --tests "com.syncrobotic.webrtc.config.RetryConfigTest.RC-01*"
+```
+
+#### E2E 測試行為說明
+
+| 測試類型 | 需要什麼 | 沒有時的行為 |
+|---------|---------|-------------|
+| Signaling tests | 無（MockWhepWhipServer 自動啟動） | 一定會跑 ✅ |
+| Full WebRTC tests | webrtc-java native libs | `assumeWebRTCAvailable()` → skip |
+
+---
+
+### Level 2: Testcontainers MediaMTX Integration
+
+> **前提條件**: Docker Desktop 已安裝並啟動
+> **預計耗時**: 首次 ~2 分鐘（拉 image），之後 ~30 秒
+
+#### 已知限制
+
+> **Docker Desktop 29.x 相容性問題**：Testcontainers 1.21.x 使用 docker-java 3.4.x，
+> 其 Docker API client version (1.32) 低於 Docker Engine 29+ 的最低要求 (1.44)，
+> 導致測試被 skip。此為上游問題 ([testcontainers/testcontainers-java#9925](https://github.com/testcontainers/testcontainers-java/issues/9925))。
+>
+> **解法**（擇一）：
+> 1. 使用 Docker Desktop **v27.x** 或 **v28.x**（支援 API 1.32）
+> 2. 等待 Testcontainers 升級 docker-java 至 3.5+（已在進行中）
+> 3. 在 CI 環境中使用 Docker Engine 28.x
+
+#### Step 0 — 確認 Docker 可用
+
+```bash
+docker info
+# 應顯示 Docker 版本資訊，不是 error
+
+# 確認 Docker API 相容性
+docker version --format '{{.Server.MinAPIVersion}}'
+# 如果輸出 >= 1.44，代表需要 Docker Desktop 28.x 或更舊版本才能跑 Testcontainers
+```
+
+如果沒有 Docker：
+1. 下載 [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/)
+2. 安裝並啟動（menu bar 出現 🐳 圖示）
+3. 等待 `docker info` 正常回應
+
+#### Step 1 — 執行 MediaMTX 測試
+
+```bash
+./gradlew jvmTest --tests "com.syncrobotic.webrtc.e2e.MediaMTX*"
+```
+
+首次執行時，Testcontainers 會自動：
+1. 拉取 `bluenviron/mediamtx:latest` Docker image
+2. 啟動 MediaMTX container（暴露 RTSP 8554 + WebRTC 8889）
+3. 等待 server ready（log 偵測 "listener opened"）
+4. 執行 8 個 integration tests
+5. 自動停止並清理 container
+
+#### Step 2 — 確認結果
+
+```
+BUILD SUCCESSFUL
+```
+
+測試報告：`build/reports/tests/jvmTest/index.html`
+搜尋 `MediaMTXIntegrationTest` 確認 8 tests passed。
+
+#### Docker 不可用時的行為
+
+| Docker 狀態 | 測試結果 |
+|-------------|---------|
+| Docker 未安裝 | 8 tests **skipped** (不算 failure) |
+| Docker 未啟動 | 8 tests **skipped** |
+| Docker 啟動但 pull 失敗 | 8 tests **skipped** |
+| Docker 正常運行 | 8 tests **executed** |
+
+---
+
+### Test Coverage Report
+
+> **前提條件**: build.gradle.kts 已加入 Kover plugin（已配置）
+
+```bash
+# 產生 HTML 覆蓋率報告
+./gradlew koverHtmlReport
+
+# 報告位置
+open build/reports/kover/html/index.html
+```
+
+其他覆蓋率指令：
+
+```bash
+# XML 報告（CI / SonarQube / Codecov 用）
+./gradlew koverXmlReport
+
+# Terminal 直接印出覆蓋率摘要
+./gradlew koverLog
+```
+
+---
+
+### Quick Reference
+
+```bash
+# 一鍵跑全部（Unit + E2E + Testcontainers）
+./gradlew jvmTest
+
+# 一鍵跑全部 + 覆蓋率報告
+./gradlew jvmTest koverHtmlReport && open build/reports/kover/html/index.html
+
+# 只跑 Level 1
+./gradlew jvmTest --tests "com.syncrobotic.webrtc.*"
+
+# 只跑 Level 2
 ./gradlew jvmTest --tests "com.syncrobotic.webrtc.e2e.MediaMTX*"
 
-# Specific test class
-./gradlew jvmTest --tests "com.syncrobotic.webrtc.config.RetryConfigTest"
-
-# Test coverage report (requires Kover plugin)
-./gradlew koverHtmlReport
-# Report: build/reports/kover/html/index.html
+# 強制重跑（忽略 cache）
+./gradlew jvmTest --rerun
 ```

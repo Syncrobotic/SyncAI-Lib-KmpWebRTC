@@ -43,6 +43,8 @@ class MediaMTXIntegrationTest {
         try {
             mediamtx = MediaMTXContainer().apply { start() }
         } catch (e: Exception) {
+            System.err.println("MediaMTX container failed to start: ${e.message}")
+            e.printStackTrace(System.err)
             assumeTrue("MediaMTX container failed to start: ${e.message}", false)
         }
     }

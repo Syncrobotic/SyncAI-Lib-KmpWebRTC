@@ -207,6 +207,20 @@ tasks.withType<PublishToMavenLocal>().configureEach {
     onlyIf { publication.name !in excludedPublications }
 }
 
+// Testcontainers + Docker Engine 29+ compatibility
+// docker-java defaults to API 1.32, but Docker 29+ requires >= 1.44
+tasks.withType<Test>().configureEach {
+    // docker-java reads: system prop "api.version" → env "DOCKER_API_VERSION"
+    environment("DOCKER_API_VERSION", "1.44")
+    systemProperty("api.version", "1.44")
+    // Colima socket path for macOS (when using Colima instead of Docker Desktop)
+    val colimaSocket = file("${System.getProperty("user.home")}/.colima/default/docker.sock")
+    if (colimaSocket.exists()) {
+        environment("DOCKER_HOST", "unix://${colimaSocket.absolutePath}")
+        environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
+    }
+}
+
 // Auto-configure git hooks path on first build (like Husky for JS)
 tasks.register<Exec>("installGitHooks") {
     description = "Configures git to use .githooks/ directory for hooks"

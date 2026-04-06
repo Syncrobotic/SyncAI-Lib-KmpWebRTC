@@ -22,7 +22,7 @@ webrtc-java = "0.14.0"
 slf4j = "2.0.9"
 
 # Test dependencies
-testcontainers = "1.19.7"
+testcontainers = "1.21.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
