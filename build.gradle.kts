@@ -16,6 +16,7 @@ plugins {
     alias(webrtcLibs.plugins.kotlinCocoapods)
     alias(webrtcLibs.plugins.kotlinSerialization)
     `maven-publish`
+    id("org.jetbrains.kotlinx.kover") version "0.9.1"
 }
 
 group = "com.syncrobotic"
