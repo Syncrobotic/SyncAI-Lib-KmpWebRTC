@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.5.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.4.1...v1.5.0) (2026-04-07)
+
+
+### Features
+
+* add AudioPlayer composable for receiving remote audio ([8a7734c](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/8a7734c8dd95660116fc8178236f7ee52cae04f0))
+* add camera capture support for all platforms (Android/iOS/JVM) ([cc9c866](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/cc9c86672f5e7b79ecd16031c93280964b14909b))
+* add CameraPreview composable for local camera display ([b74d2f7](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/b74d2f74796b86feb8d5e8baa2ae650653cd0c4d))
+* add unified WebRTCSession with flexible media direction support ([1e6958d](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/1e6958d0d70c483f909d1ed1cdaf7be0e2c37fe4))
+* expose public callbacks for custom video rendering ([b6dbdef](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/b6dbdefe37bbd4bf5ca4ee83a3f8e9f329eef3c4))
+
 ## [1.4.1](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.4.0...v1.4.1) (2026-04-01)
 
 
