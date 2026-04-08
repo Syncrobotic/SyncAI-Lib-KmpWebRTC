@@ -144,16 +144,9 @@ actual class WebRTCClient {
             createPeerConnectionObserver()
         )
 
-        peerConnection?.addTransceiver(
-            MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
-            RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY)
-        )
+        // Transceivers are set up by createFlexibleOffer() — do not add them here
+        // to avoid duplicate m=video/m=audio sections in the SDP offer.
 
-        peerConnection?.addTransceiver(
-            MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO,
-            RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY)
-        )
-        
         configureSpeakerphone(context, true)
     }
     
@@ -174,9 +167,9 @@ actual class WebRTCClient {
 
         eglBase = EglBase.create()
 
-        // Create factory (each connection has its own factory for isolation)
+        // Create factory with video + audio support so SEND_VIDEO can encode camera frames
         PeerConnectionFactoryManager.ensureInitialized(context)
-        peerConnectionFactory = PeerConnectionFactoryManager.createForAudio(context)
+        peerConnectionFactory = PeerConnectionFactoryManager.createForVideoAndAudio(context, eglBase!!)
 
         val iceServers = config.iceServers.map { ice ->
             PeerConnection.IceServer.builder(ice.urls)
@@ -341,19 +334,16 @@ actual class WebRTCClient {
         return renderer
     }
 
-    private inner class FrameCapturingSink(private val targetSink: VideoSink?) : VideoSink {
+    private inner class FrameCapturingSink : VideoSink {
         override fun onFrame(frame: org.webrtc.VideoFrame) {
-            val width = frame.rotatedWidth
-            val height = frame.rotatedHeight
-
             listener?.onVideoFrame(VideoFrame(
-                width = width,
-                height = height,
+                width = frame.rotatedWidth,
+                height = frame.rotatedHeight,
                 timestampNs = frame.timestampNs,
                 nativeFrame = frame
             ))
-
-            targetSink?.onFrame(frame)
+            // Always use the current surfaceViewRenderer reference — handles late init
+            surfaceViewRenderer?.onFrame(frame)
         }
     }
 
@@ -444,7 +434,7 @@ actual class WebRTCClient {
                 listener?.onTracksChanged(videoTrackCount, audioTrackCount, tracks)
                 
                 if (stream.videoTracks.isNotEmpty()) {
-                    frameCapturingSink = FrameCapturingSink(surfaceViewRenderer)
+                    frameCapturingSink = FrameCapturingSink()
                     stream.videoTracks[0].addSink(frameCapturingSink)
                 }
             }
@@ -459,7 +449,7 @@ actual class WebRTCClient {
 
             override fun onAddTrack(receiver: RtpReceiver, streams: Array<out MediaStream>) {
                 if (receiver.track()?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND) {
-                    frameCapturingSink = FrameCapturingSink(surfaceViewRenderer)
+                    frameCapturingSink = FrameCapturingSink()
                     (receiver.track() as? VideoTrack)?.addSink(frameCapturingSink)
                 }
             }
@@ -467,7 +457,7 @@ actual class WebRTCClient {
             override fun onTrack(transceiver: RtpTransceiver) {
                 val track = transceiver.receiver.track()
                 if (track?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND) {
-                    frameCapturingSink = FrameCapturingSink(surfaceViewRenderer)
+                    frameCapturingSink = FrameCapturingSink()
                     (track as? VideoTrack)?.addSink(frameCapturingSink)
                 }
             }

@@ -2,6 +2,26 @@
 
 > 45 項手動整合測試的執行指南（排除 S-4）
 
+## 測試進度總覽
+
+| 群組 | 通過 | 總數 | 狀態 |
+|------|------|------|------|
+| S-1a MediaMTX ↔ App | 4 | 5 | S1a-05 未測 |
+| S-1b IoT → MediaMTX → App | 4 | 6 | S1b-03, S1b-04 未測 |
+| S-2 BE Signaling Proxy | 6 | 6 | ✅ 全通 |
+| S-3 Pion SFU | 4 | 4 | ✅ 全通 |
+| S-5 Dual Session IoT | 0 | 3 | ⏳ 需 DataChannel UI |
+| C-1 Bidirectional Call | 0 | 5 | ⏳ 需 VIDEO_CALL / DataChannel UI |
+| C-2 External IoT | 3 | 5 | C2-03, C2-04 需新功能 |
+| C-3 Multiple VideoRenderer | 0 | 4 | ⏳ 需 App 新功能 |
+| C-4 1-to-N | 4 | 4 | ✅ 全通 |
+| C-5 DataChannel | 0 | 5 | ⏳ 需 DataChannel UI |
+| **合計** | **25** | **47** | **~53%** |
+
+> 圖例：✅ Pass　⚠️ Partial　⏳ 待測（需新功能）　⬜ 待測
+
+---
+
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
@@ -77,7 +97,7 @@ ffmpeg-source     running   (推流中，無對外 port)
 
 ```bash
 # MediaMTX 健康檢查
-curl http://localhost:8889/v3/config/global/get
+curl http://localhost:9997/v3/config/global/get
 
 # Pion IoT 健康檢查
 curl http://localhost:8080/health
@@ -143,7 +163,7 @@ cd SyncAI-Lib-KmpWebRTC/
 - MediaMTX 收到串流：`curl http://localhost:9997/v3/paths/list` 應包含 `test-video`
 - 或用瀏覽器開啟 `http://<HOST>:8889/test-video/` 確認有畫面
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -159,7 +179,7 @@ cd SyncAI-Lib-KmpWebRTC/
 - SessionState → `Connected`
 - `curl http://localhost:9997/v3/paths/list` 包含 `test-audio`
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -178,7 +198,7 @@ cd SyncAI-Lib-KmpWebRTC/
 - VideoRenderer 顯示畫面
 - WebRTCStats 顯示 audioBitrate/videoBitrate > 0
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -194,7 +214,7 @@ cd SyncAI-Lib-KmpWebRTC/
 - App B 看到 App A 的攝影機畫面
 - 延遲可接受 (< 500ms)
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -232,7 +252,7 @@ curl http://localhost:9997/v3/paths/list
 - MediaMTX paths 列表包含 `iot-camera`
 - 可選：用 VLC 開啟 `rtsp://<HOST>:8554/iot-camera` 確認
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -248,7 +268,7 @@ curl http://localhost:9997/v3/paths/list
 - 看到 FFmpeg 測試畫面 (彩色條紋 + 計時器)
 - SessionState → `Connected`
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -295,7 +315,7 @@ curl http://localhost:9997/v3/paths/list
 - FFmpeg 恢復後 App A 自動重連 → `Connected`
 - 畫面恢復
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -311,7 +331,7 @@ curl http://localhost:9997/v3/paths/list
 - MediaMTX 恢復後 App A 自動重連 → `Connected`
 - FFmpeg 也重新推流 (或手動重啟 ffmpeg-source)
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -341,7 +361,7 @@ curl http://localhost:9997/v3/paths/list
 - App A 收到 Pion 的視訊 → `Connected`
 - Proxy log 顯示只有 HTTP 流量，無 RTP
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -357,7 +377,7 @@ curl http://localhost:9997/v3/paths/list
 - 無 token → 收到 401 Unauthorized
 - 有效 token → 正常連線 `Connected`
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -372,7 +392,7 @@ curl http://localhost:9997/v3/paths/list
 - App A 收到錯誤 → SessionState: `Error` (502)
 - 如果 RetryConfig 啟用，App A 進入 `Reconnecting` 狀態
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -388,7 +408,7 @@ curl http://localhost:9997/v3/paths/list
 - App A 自動重連成功 → `Connected`
 - 視訊恢復正常
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -407,7 +427,7 @@ curl http://localhost:9997/v3/paths/list
 - 兩個 App 各自連到正確的串流
 - 互不干擾
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -424,7 +444,7 @@ curl http://localhost:9997/v3/paths/list
 - App A 同時收到視訊 + 發出音訊
 - Proxy log 顯示兩條 SDP 轉發記錄
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -448,7 +468,7 @@ curl http://localhost:9997/v3/paths/list
 - App A 收到經 Pion SFU 轉發的視訊
 - SessionState → `Connected`
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -464,7 +484,7 @@ curl http://localhost:9997/v3/paths/list
 - 三端都收到視訊
 - Pion SFU 只收到一份 WHIP 輸入
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -478,7 +498,7 @@ curl http://localhost:9997/v3/paths/list
 - 所有 viewer (App A/B/C) 偵測到 → `Reconnecting` 或 `Error`
 - Viewer 顯示適當的錯誤/重連狀態
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -494,7 +514,7 @@ curl http://localhost:9997/v3/paths/list
 - App A, App B 畫面不中斷
 - App D 成功收到視訊
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -506,7 +526,7 @@ curl http://localhost:9997/v3/paths/list
 
 ---
 
-#### S5-01: Video + DataChannel 分離 session
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A:
@@ -519,11 +539,11 @@ curl http://localhost:9997/v3/paths/list
 - Video session 顯示畫面
 - DataChannel session 可發送/接收訊息
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### S5-02: DataChannel 指令送達
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A 透過 DataChannel session 發送：
@@ -536,11 +556,11 @@ curl http://localhost:9997/v3/paths/list
 - Pion 回應：`{"status": "ok", "uptime": 123}`
 - App A 收到回應並顯示
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### S5-03: 經 BE proxy
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. Proxy 註冊 device：
@@ -557,7 +577,7 @@ curl http://localhost:9997/v3/paths/list
 - Media/DC 直連 Pion（不經 Proxy）
 - 兩個 session 都正常運作
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
@@ -568,7 +588,7 @@ curl http://localhost:9997/v3/paths/list
 
 ---
 
-#### C1-01: Video call
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A: `MediaConfig.VIDEO_CALL` → `http://<HOST>:8080/videocall/whip`
@@ -580,7 +600,7 @@ curl http://localhost:9997/v3/paths/list
 - App B 看到 App A 的攝影機
 - 兩端都有音訊
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
@@ -594,11 +614,11 @@ curl http://localhost:9997/v3/paths/list
 - App A 說話 → App B 聽到
 - App B 說話 → App A 聽到
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⚠️ Partial — 單向通（App A→B 音訊正常，雙向需 Pion echo endpoint）
 
 ---
 
-#### C1-03: Camera switch
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. C1-01 場景運行中
@@ -608,11 +628,11 @@ curl http://localhost:9997/v3/paths/list
 - App A 的預覽切換鏡頭
 - App B (remote) 看到的畫面也切換
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### C1-04: Video + DataChannel 同時
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A: VIDEO_CALL + createDataChannel("chat")
@@ -624,11 +644,11 @@ curl http://localhost:9997/v3/paths/list
 - DataChannel 訊息正確送達/收到
 - 互不干擾
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### C1-05: Media controls during call
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. C1-01 場景運行中
@@ -643,7 +663,7 @@ curl http://localhost:9997/v3/paths/list
 - 靜音時對方聽不到
 - 關閉視訊時對方看不到畫面
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
@@ -664,7 +684,7 @@ curl http://localhost:9997/v3/paths/list
 - App A 收到 Pion 的視訊 → 畫面顯示
 - `Connected` 狀態
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -677,11 +697,11 @@ curl http://localhost:9997/v3/paths/list
 - `Connected` 狀態
 - Pion log 顯示收到音訊 track
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
-#### C2-03: DataChannel commands
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A 連線到 Pion 並建立 DataChannel
@@ -693,11 +713,11 @@ curl http://localhost:9997/v3/paths/list
 - App A 顯示回應內容
 - 雙向訊息傳遞正常
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### C2-04: 語音對講 (intercom)
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A:
@@ -709,7 +729,7 @@ curl http://localhost:9997/v3/paths/list
 - 同時收到視訊 + 發出音訊
 - 兩個 session 互不干擾
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
@@ -724,7 +744,7 @@ curl http://localhost:9997/v3/paths/list
 - SDP 交換正常，ICE 連線正常
 - 視訊/音訊播放正常
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -753,7 +773,7 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 
 ---
 
-#### C3-01: 2 video sessions
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A 建立 2 個 WebRTCSession：
@@ -764,11 +784,11 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - 兩個 VideoRenderer 都顯示不同畫面
 - 兩個 session 都 `Connected`
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### C3-02: 4 video sessions (grid)
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A 建立 4 個 WebRTCSession：
@@ -780,11 +800,11 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - 效能可接受 (不明顯掉幀/延遲)
 - 記錄 CPU/Memory 使用量
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### C3-03: Independent lifecycle
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. C3-01 場景 (2 sessions) 運行中
@@ -794,11 +814,11 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - Session 1 → `Closed`
 - Session 2 不受影響，仍 `Connected`，畫面正常
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### C3-04: Different MediaConfig per session
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. Session 1: `RECEIVE_VIDEO` → WHEP 收看 `stream-1`
@@ -809,7 +829,7 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - Session 2 收發都有
 - 各自依照自己的 MediaConfig 運作
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
@@ -833,7 +853,7 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - 3 個 viewer 都看到 App A 的畫面
 - App A 的 stats 正常
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -847,7 +867,7 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - App B 立即收到視訊 (不需等 keyframe 太久)
 - 畫面正常顯示
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -861,7 +881,7 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - App A (publisher) 不受影響
 - App B 畫面不中斷
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -877,7 +897,7 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - Viewers 偵測到中斷 → `Reconnecting`
 - App A 重連後 viewers 自動恢復 → `Connected`
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -888,7 +908,7 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 
 ---
 
-#### C5-01: Text messaging
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A 連到 Pion + 建立 DataChannel ("messages", reliable)
@@ -903,11 +923,11 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - Pion echo 回所有訊息
 - 順序正確 (seq 1, 2, 3)
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### C5-02: Binary messaging
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A 連到 Pion + DataChannel
@@ -917,11 +937,11 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - Pion echo 回相同 binary data
 - 資料完整無損
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### C5-03: Multiple channels
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A 建立 2+ DataChannels：
@@ -934,11 +954,11 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - "control" channel 訊息有序
 - "telemetry" channel 可能亂序（unreliable）
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### C5-04: Channel with video
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A:
@@ -951,11 +971,11 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - DataChannel 不受視訊影響
 - 兩者同時正常運作
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 
-#### C5-05: High-frequency messaging
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 **步驟：**
 1. App A 連到 Pion + DataChannel (reliable)
@@ -969,7 +989,7 @@ docker exec -d ffmpeg-source ffmpeg -re -f lavfi -i "color=c=blue:size=640x480:r
 - 全部收到，無遺漏
 - 順序正確 (reliable mode)
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ⏳ 待測 — 需要 App 新功能或 Pion echo endpoint
 
 ---
 

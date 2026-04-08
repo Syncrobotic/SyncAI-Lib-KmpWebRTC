@@ -56,9 +56,12 @@ services:
     entrypoint: >
       ffmpeg
         -re
-        -f lavfi -i "testsrc=size=640x480:rate=30:duration=86400"
+        -f lavfi -i "testsrc2=size=640x480:rate=30:duration=86400"
         -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=86400"
-        -c:v libx264 -preset ultrafast -tune zerolatency -b:v 1M
+        -vf "format=yuv420p"
+        -c:v libx264 -profile:v baseline -level:v 3.1
+        -preset ultrafast -tune zerolatency -b:v 1M -pix_fmt yuv420p
+        -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv
         -c:a aac -b:a 128k
         -f rtsp rtsp://mediamtx:8554/iot-camera
     restart: unless-stopped
