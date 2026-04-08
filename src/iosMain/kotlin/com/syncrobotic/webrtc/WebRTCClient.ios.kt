@@ -1,11 +1,19 @@
 package com.syncrobotic.webrtc
 
 import cocoapods.GoogleWebRTC.*
+import com.syncrobotic.webrtc.config.VideoCaptureConfig
 import com.syncrobotic.webrtc.config.WebRTCConfig
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
+import kotlinx.cinterop.useContents
 import kotlinx.coroutines.suspendCancellableCoroutine
+import platform.AVFoundation.AVCaptureDevice
+import platform.AVFoundation.AVCaptureDeviceFormat
+import platform.AVFoundation.AVCaptureDevicePositionBack
+import platform.AVFoundation.AVCaptureDevicePositionFront
+import platform.AVFoundation.position
 import platform.CoreGraphics.CGSize
+import platform.CoreMedia.CMVideoFormatDescriptionGetDimensions
 import platform.Foundation.NSDate
 import platform.Foundation.NSNumber
 import platform.Foundation.timeIntervalSince1970
@@ -184,6 +192,12 @@ actual class WebRTCClient {
     private var localAudioTrack: RTCAudioTrack? = null
     private var _isAudioEnabled = true
     private var _isSpeakerphoneEnabled = true
+
+    private var cameraCapturer: RTCCameraVideoCapturer? = null
+    private var localVideoSource: RTCVideoSource? = null
+    private var localVideoTrack: RTCVideoTrack? = null
+    private var currentCameraPosition: Long = AVCaptureDevicePositionFront
+    private var _isVideoEnabled = true
     
     private var peerConnectionDelegate: PeerConnectionDelegate? = null
     private var videoSink: Any? = null
@@ -328,6 +342,133 @@ actual class WebRTCClient {
         }
     }
     
+    /**
+     * Initialize local camera capture for sending video.
+     * Creates a video source, camera capturer, and video track, then adds it to the peer connection.
+     */
+    fun initializeCameraCapture(config: VideoCaptureConfig) {
+        val factory = peerConnectionFactory ?: return
+
+        // Create video source from factory
+        localVideoSource = factory.videoSource()
+        val videoSource = localVideoSource ?: return
+
+        // Create camera capturer with video source as delegate
+        cameraCapturer = RTCCameraVideoCapturer(delegate = videoSource)
+        val capturer = cameraCapturer ?: return
+
+        // Set initial camera position based on config
+        currentCameraPosition = if (config.useFrontCamera) {
+            AVCaptureDevicePositionFront
+        } else {
+            AVCaptureDevicePositionBack
+        }
+
+        // Find appropriate camera device
+        val allDevices = RTCCameraVideoCapturer.captureDevices() ?: emptyList<Any>()
+        var device: AVCaptureDevice? = null
+        for (d in allDevices) {
+            val captureDevice = d as? AVCaptureDevice ?: continue
+            if (captureDevice.position == currentCameraPosition) {
+                device = captureDevice
+                break
+            }
+        }
+        if (device == null) device = allDevices.firstOrNull() as? AVCaptureDevice
+        if (device == null) {
+            println("[WebRTCClient] [iOS] No video capture devices found")
+            return
+        }
+
+        println("[WebRTCClient] [iOS] Using camera device: ${device.localizedName}")
+
+        // Find the best matching format for the requested resolution
+        val formats = RTCCameraVideoCapturer.supportedFormatsForDevice(device)?.filterIsInstance<AVCaptureDeviceFormat>() ?: emptyList()
+        val targetFormat = formats.minByOrNull { format ->
+            val desc = (format as AVCaptureDeviceFormat).formatDescription
+            if (desc != null) {
+                val dim = CMVideoFormatDescriptionGetDimensions(desc)
+                val widthDiff = kotlin.math.abs(dim.useContents { width } - config.width)
+                val heightDiff = kotlin.math.abs(dim.useContents { height } - config.height)
+                widthDiff + heightDiff
+            } else {
+                Int.MAX_VALUE
+            }
+        }
+        if (targetFormat == null) {
+            println("[WebRTCClient] [iOS] No supported formats found for device")
+            return
+        }
+
+        // Start capture
+        capturer.startCaptureWithDevice(device, format = targetFormat, fps = config.fps.toLong())
+
+        // Create video track from factory
+        localVideoTrack = factory.videoTrackWithSource(videoSource, trackId = "video0")
+        localVideoTrack?.isEnabled = true
+        _isVideoEnabled = true
+
+        // Add track to peer connection
+        localVideoTrack?.let { track ->
+            peerConnection?.addTrack(track, streamIds = listOf("local-video-stream"))
+        }
+
+        println("[WebRTCClient] [iOS] Camera capture initialized: ${config.width}x${config.height}@${config.fps}fps")
+    }
+
+    /**
+     * Switch between front and back camera.
+     */
+    fun switchCamera() {
+        val capturer = cameraCapturer ?: return
+
+        // Stop current capture
+        capturer.stopCapture()
+
+        // Switch position
+        currentCameraPosition = if (currentCameraPosition == AVCaptureDevicePositionFront) {
+            AVCaptureDevicePositionBack
+        } else {
+            AVCaptureDevicePositionFront
+        }
+
+        // Find new device
+        @Suppress("UNCHECKED_CAST")
+        val devices = RTCCameraVideoCapturer.captureDevices() as? List<AVCaptureDevice> ?: emptyList()
+        val device = devices.firstOrNull { it.position() == currentCameraPosition }
+        if (device == null) {
+            println("[WebRTCClient] [iOS] No camera found for position: $currentCameraPosition")
+            return
+        }
+
+        // Find a format for the new device
+        val formats = RTCCameraVideoCapturer.supportedFormatsForDevice(device)?.filterIsInstance<AVCaptureDeviceFormat>() ?: emptyList()
+        val format = formats.lastOrNull()
+        if (format == null) {
+            println("[WebRTCClient] [iOS] No supported formats for device")
+            return
+        }
+
+        // Start capture with new device
+        capturer.startCaptureWithDevice(device, format = format, fps = 30)
+        println("[WebRTCClient] [iOS] Switched to camera: ${device.localizedName}")
+    }
+
+    /**
+     * Enable or disable the local video track.
+     */
+    fun setVideoEnabled(enabled: Boolean) {
+        localVideoTrack?.isEnabled = enabled
+        _isVideoEnabled = enabled
+    }
+
+    /**
+     * Enable or disable the received (remote) video track.
+     */
+    fun setRemoteVideoEnabled(enabled: Boolean) {
+        videoTrack?.isEnabled = enabled
+    }
+
     private fun configureAudioSession() {
         val audioSession = RTCAudioSession.sharedInstance()
         audioSession.lockForConfiguration()
@@ -481,6 +622,101 @@ actual class WebRTCClient {
         }
     }
     
+    actual suspend fun createFlexibleOffer(
+        mediaConfig: com.syncrobotic.webrtc.config.MediaConfig
+    ): String = suspendCancellableCoroutine { cont ->
+        val pc = peerConnection
+        if (pc == null) {
+            cont.resumeWithException(Exception("PeerConnection not initialized"))
+            return@suspendCancellableCoroutine
+        }
+
+        try {
+            // Video transceiver
+            mediaConfig.videoDirection?.let { dir ->
+                val nativeDir = when (dir) {
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_ONLY ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionSendOnly
+                    com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionRecvOnly
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionSendRecv
+                }
+                if (dir.isSending && localVideoTrack != null) {
+                    // Track already added by initializeCameraCapture() — set direction on existing transceiver
+                    val existingTransceiver = pc.transceivers.filterIsInstance<RTCRtpTransceiver>()
+                        .firstOrNull { it.mediaType == RTCRtpMediaType.RTCRtpMediaTypeVideo }
+                    if (existingTransceiver != null) {
+                        existingTransceiver.setDirection(nativeDir, error = null)
+                    } else {
+                        pc.addTrack(localVideoTrack!!, streamIds = listOf("local-video-stream"))
+                        pc.transceivers.filterIsInstance<RTCRtpTransceiver>()
+                            .lastOrNull { it.mediaType == RTCRtpMediaType.RTCRtpMediaTypeVideo }
+                            ?.setDirection(nativeDir, error = null)
+                    }
+                } else {
+                    pc.addTransceiverOfType(
+                        RTCRtpMediaType.RTCRtpMediaTypeVideo,
+                        init = RTCRtpTransceiverInit().apply {
+                            direction = nativeDir
+                        }
+                    )
+                }
+            }
+
+            // Audio transceiver
+            mediaConfig.audioDirection?.let { dir ->
+                val nativeDir = when (dir) {
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_ONLY ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionSendOnly
+                    com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionRecvOnly
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV ->
+                        RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionSendRecv
+                }
+                if (dir.isSending && localAudioTrack != null) {
+                    pc.addTrack(localAudioTrack!!, streamIds = listOf("local-audio-stream"))
+                    // Update transceiver direction
+                    pc.transceivers.filterIsInstance<RTCRtpTransceiver>()
+                        .lastOrNull { it.mediaType == RTCRtpMediaType.RTCRtpMediaTypeAudio }
+                        ?.setDirection(nativeDir, error = null)
+                } else {
+                    pc.addTransceiverOfType(
+                        RTCRtpMediaType.RTCRtpMediaTypeAudio,
+                        init = RTCRtpTransceiverInit().apply {
+                            direction = nativeDir
+                        }
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            cont.resumeWithException(Exception("Failed to setup transceivers: ${e.message}"))
+            return@suspendCancellableCoroutine
+        }
+
+        val constraints = RTCMediaConstraints(
+            mandatoryConstraints = null,
+            optionalConstraints = null
+        )
+
+        pc.offerForConstraints(constraints) { sdp, error ->
+            if (error != null) {
+                cont.resumeWithException(Exception("Failed to create flexible offer: ${error.localizedDescription}"))
+                return@offerForConstraints
+            }
+
+            sdp?.let { sessionDescription ->
+                pc.setLocalDescription(sessionDescription) { setError ->
+                    if (setError != null) {
+                        cont.resumeWithException(Exception("Failed to set local description: ${setError.localizedDescription}"))
+                    } else {
+                        cont.resume(sessionDescription.sdp)
+                    }
+                }
+            } ?: cont.resumeWithException(Exception("SDP is null"))
+        }
+    }
+
     actual fun setAudioEnabled(enabled: Boolean) {
         localAudioTrack?.isEnabled = enabled
         _isAudioEnabled = enabled
@@ -533,6 +769,11 @@ actual class WebRTCClient {
 
     actual fun getVideoSink(): Any? = videoTrack
     
+    /**
+     * Get the local video track (for camera preview rendering).
+     */
+    fun getLocalVideoTrack(): RTCVideoTrack? = localVideoTrack
+
     /**
      * Create a Metal-based video view for rendering.
      * Call this to get a UIView that can be added to the SwiftUI/UIKit hierarchy.
@@ -687,6 +928,11 @@ actual class WebRTCClient {
     }
 
     actual fun close() {
+        cameraCapturer?.stopCapture()
+        cameraCapturer = null
+        localVideoSource = null
+        localVideoTrack = null
+
         localAudioTrack?.isEnabled = false
         localAudioTrack = null
         localAudioSource = null

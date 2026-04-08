@@ -23,6 +23,12 @@ actual class WebRTCClient {
     private var audioSource: AudioSource? = null
     private var localAudioTrack: AudioTrack? = null
     private var _isAudioEnabled = true
+
+    private var videoCapturer: org.webrtc.CameraVideoCapturer? = null
+    private var localVideoSource: org.webrtc.VideoSource? = null
+    private var localVideoTrack: org.webrtc.VideoTrack? = null
+    private var surfaceTextureHelper: org.webrtc.SurfaceTextureHelper? = null
+    private var _isVideoEnabled = true
     
     private var audioManager: AudioManager? = null
     private var _isSpeakerphoneEnabled = true
@@ -138,16 +144,9 @@ actual class WebRTCClient {
             createPeerConnectionObserver()
         )
 
-        peerConnection?.addTransceiver(
-            MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
-            RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY)
-        )
+        // Transceivers are set up by createFlexibleOffer() — do not add them here
+        // to avoid duplicate m=video/m=audio sections in the SDP offer.
 
-        peerConnection?.addTransceiver(
-            MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO,
-            RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY)
-        )
-        
         configureSpeakerphone(context, true)
     }
     
@@ -168,9 +167,9 @@ actual class WebRTCClient {
 
         eglBase = EglBase.create()
 
-        // Create factory (each connection has its own factory for isolation)
+        // Create factory with video + audio support so SEND_VIDEO can encode camera frames
         PeerConnectionFactoryManager.ensureInitialized(context)
-        peerConnectionFactory = PeerConnectionFactoryManager.createForAudio(context)
+        peerConnectionFactory = PeerConnectionFactoryManager.createForVideoAndAudio(context, eglBase!!)
 
         val iceServers = config.iceServers.map { ice ->
             PeerConnection.IceServer.builder(ice.urls)
@@ -213,14 +212,97 @@ actual class WebRTCClient {
         localAudioTrack?.setEnabled(true)
         _isAudioEnabled = true
 
-        val streamId = "local-audio-stream"
-        localAudioTrack?.let { track ->
-            peerConnection?.addTrack(track, listOf(streamId))
-        }
-        
+        // NOTE: do NOT addTrack() here — createFlexibleOffer() will add the track
+        // via addTransceiver() with the correct direction. Adding twice creates
+        // duplicate transceivers that break ICE negotiation (stuck "connecting").
+
         configureSpeakerphone(context, true)
     }
     
+    /**
+     * Initialize camera capture for sending video.
+     * Call after initializeForSending() or initializeWithContext().
+     */
+    fun initializeCameraCapture(context: android.content.Context, config: com.syncrobotic.webrtc.config.VideoCaptureConfig) {
+        val factory = peerConnectionFactory ?: return
+
+        // Create camera capturer
+        val camera2Enumerator = org.webrtc.Camera2Enumerator(context)
+        val deviceNames = camera2Enumerator.deviceNames
+
+        // Select front or rear camera
+        val targetDeviceName = if (config.useFrontCamera) {
+            deviceNames.firstOrNull { camera2Enumerator.isFrontFacing(it) }
+        } else {
+            deviceNames.firstOrNull { camera2Enumerator.isBackFacing(it) }
+        } ?: deviceNames.firstOrNull()
+
+        if (targetDeviceName == null) {
+            android.util.Log.e("WebRTCClient", "No camera device found")
+            return
+        }
+
+        videoCapturer = camera2Enumerator.createCapturer(targetDeviceName, null)
+
+        // Create surface texture helper for video processing
+        surfaceTextureHelper = org.webrtc.SurfaceTextureHelper.create(
+            "CaptureThread",
+            eglBase?.eglBaseContext
+        )
+
+        // Create video source
+        localVideoSource = factory.createVideoSource(videoCapturer!!.isScreencast)
+        videoCapturer?.initialize(surfaceTextureHelper, context, localVideoSource?.capturerObserver)
+
+        // Start capture
+        videoCapturer?.startCapture(config.width, config.height, config.fps)
+
+        // Create video track
+        localVideoTrack = factory.createVideoTrack("local-video", localVideoSource)
+        localVideoTrack?.setEnabled(true)
+        _isVideoEnabled = true
+
+        // NOTE: do NOT addTrack() here — createFlexibleOffer() will add the track
+        // via addTransceiver() with the correct direction. Adding twice creates
+        // duplicate transceivers that cause video to not transmit.
+
+        android.util.Log.d("WebRTCClient", "Camera capture initialized: ${config.width}x${config.height}@${config.fps}fps, device=$targetDeviceName")
+    }
+
+    /**
+     * Switch between front and rear camera.
+     */
+    fun switchCamera() {
+        (videoCapturer as? org.webrtc.CameraVideoCapturer)?.switchCamera(null)
+    }
+
+    /**
+     * Get the local video track (for camera preview rendering).
+     */
+    fun getLocalVideoTrack(): org.webrtc.VideoTrack? = localVideoTrack
+
+    /**
+     * Enable or disable the local video track.
+     */
+    fun setVideoEnabled(enabled: Boolean) {
+        localVideoTrack?.setEnabled(enabled)
+        _isVideoEnabled = enabled
+    }
+
+    /**
+     * Enable or disable received (remote) video tracks.
+     */
+    fun setRemoteVideoEnabled(enabled: Boolean) {
+        peerConnection?.transceivers?.forEach { transceiver ->
+            if (transceiver.mediaType == org.webrtc.MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO &&
+                transceiver.direction == org.webrtc.RtpTransceiver.RtpTransceiverDirection.RECV_ONLY ||
+                transceiver.direction == org.webrtc.RtpTransceiver.RtpTransceiverDirection.SEND_RECV
+            ) {
+                (transceiver.receiver?.track() as? org.webrtc.VideoTrack)?.setEnabled(enabled)
+            }
+        }
+    }
+
     private fun configureSpeakerphone(context: Context, enabled: Boolean) {
         try {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -241,32 +323,41 @@ actual class WebRTCClient {
      * Create a SurfaceViewRenderer for video display.
      */
     fun createSurfaceViewRenderer(context: Context): SurfaceViewRenderer {
+        android.util.Log.d("WebRTCClient", "createSurfaceViewRenderer, eglBase=$eglBase")
         val renderer = SurfaceViewRenderer(context).apply {
             init(eglBase?.eglBaseContext, null)
             setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
-            setEnableHardwareScaler(true)
+            setEnableHardwareScaler(false)
+            setZOrderMediaOverlay(true)
         }
         surfaceViewRenderer = renderer
         return renderer
     }
 
-    private inner class FrameCapturingSink(private val targetSink: VideoSink?) : VideoSink {
+    private inner class FrameCapturingSink : VideoSink {
         override fun onFrame(frame: org.webrtc.VideoFrame) {
-            val width = frame.rotatedWidth
-            val height = frame.rotatedHeight
-
             listener?.onVideoFrame(VideoFrame(
-                width = width,
-                height = height,
+                width = frame.rotatedWidth,
+                height = frame.rotatedHeight,
                 timestampNs = frame.timestampNs,
                 nativeFrame = frame
             ))
-
-            targetSink?.onFrame(frame)
+            // Always use the current surfaceViewRenderer reference — handles late init
+            surfaceViewRenderer?.onFrame(frame)
         }
     }
 
     private var frameCapturingSink: FrameCapturingSink? = null
+    private var currentVideoTrack: VideoTrack? = null
+
+    private fun attachVideoSink(track: VideoTrack) {
+        if (currentVideoTrack == track) return
+        currentVideoTrack?.removeSink(frameCapturingSink)
+        frameCapturingSink = FrameCapturingSink()
+        track.addSink(frameCapturingSink)
+        currentVideoTrack = track
+        android.util.Log.d("WebRTCClient", "attachVideoSink: attached sink to track ${track.id()}")
+    }
 
     private fun createPeerConnectionObserver(): PeerConnection.Observer {
         return object : PeerConnection.Observer {
@@ -330,9 +421,10 @@ actual class WebRTCClient {
             override fun onAddStream(stream: MediaStream) {
                 val videoTrackCount = stream.videoTracks.size
                 val audioTrackCount = stream.audioTracks.size
-                
+
+                android.util.Log.d("WebRTCClient", "onAddStream fired, videoTracks=$videoTrackCount, audioTracks=$audioTrackCount")
                 listener?.onRemoteStreamAdded()
-                
+
                 val tracks = mutableListOf<TrackInfo>()
                 stream.videoTracks.forEach { track ->
                     tracks.add(TrackInfo(
@@ -351,10 +443,9 @@ actual class WebRTCClient {
                     ))
                 }
                 listener?.onTracksChanged(videoTrackCount, audioTrackCount, tracks)
-                
+
                 if (stream.videoTracks.isNotEmpty()) {
-                    frameCapturingSink = FrameCapturingSink(surfaceViewRenderer)
-                    stream.videoTracks[0].addSink(frameCapturingSink)
+                    attachVideoSink(stream.videoTracks[0])
                 }
             }
 
@@ -367,17 +458,17 @@ actual class WebRTCClient {
             override fun onRenegotiationNeeded() {}
 
             override fun onAddTrack(receiver: RtpReceiver, streams: Array<out MediaStream>) {
+                android.util.Log.d("WebRTCClient", "onAddTrack fired, kind=${receiver.track()?.kind()}")
                 if (receiver.track()?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND) {
-                    frameCapturingSink = FrameCapturingSink(surfaceViewRenderer)
-                    (receiver.track() as? VideoTrack)?.addSink(frameCapturingSink)
+                    (receiver.track() as? VideoTrack)?.let { attachVideoSink(it) }
                 }
             }
 
             override fun onTrack(transceiver: RtpTransceiver) {
                 val track = transceiver.receiver.track()
+                android.util.Log.d("WebRTCClient", "onTrack fired, kind=${track?.kind()}")
                 if (track?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND) {
-                    frameCapturingSink = FrameCapturingSink(surfaceViewRenderer)
-                    (track as? VideoTrack)?.addSink(frameCapturingSink)
+                    (track as? VideoTrack)?.let { attachVideoSink(it) }
                 }
             }
         }
@@ -450,7 +541,86 @@ actual class WebRTCClient {
             override fun onSetFailure(error: String?) {}
         }, constraints)
     }
-    
+
+    actual suspend fun createFlexibleOffer(
+        mediaConfig: com.syncrobotic.webrtc.config.MediaConfig
+    ): String = suspendCancellableCoroutine { cont ->
+        val pc = peerConnection ?: run {
+            cont.resumeWithException(Exception("PeerConnection not initialized"))
+            return@suspendCancellableCoroutine
+        }
+
+        try {
+            // Video transceiver
+            mediaConfig.videoDirection?.let { dir ->
+                val nativeDir = when (dir) {
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_ONLY -> RtpTransceiver.RtpTransceiverDirection.SEND_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY -> RtpTransceiver.RtpTransceiverDirection.RECV_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV -> RtpTransceiver.RtpTransceiverDirection.SEND_RECV
+                }
+                if (dir.isSending && localVideoTrack != null) {
+                    // Use the real local video track for sending
+                    pc.addTransceiver(
+                        localVideoTrack,
+                        RtpTransceiver.RtpTransceiverInit(nativeDir)
+                    )
+                } else {
+                    pc.addTransceiver(
+                        MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
+                        RtpTransceiver.RtpTransceiverInit(nativeDir)
+                    )
+                }
+            }
+
+            // Audio transceiver
+            mediaConfig.audioDirection?.let { dir ->
+                val nativeDir = when (dir) {
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_ONLY -> RtpTransceiver.RtpTransceiverDirection.SEND_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.RECV_ONLY -> RtpTransceiver.RtpTransceiverDirection.RECV_ONLY
+                    com.syncrobotic.webrtc.config.TransceiverDirection.SEND_RECV -> RtpTransceiver.RtpTransceiverDirection.SEND_RECV
+                }
+                if (dir.isSending && localAudioTrack != null) {
+                    // Use the real local audio track for sending
+                    pc.addTransceiver(
+                        localAudioTrack,
+                        RtpTransceiver.RtpTransceiverInit(nativeDir)
+                    )
+                } else {
+                    pc.addTransceiver(
+                        MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO,
+                        RtpTransceiver.RtpTransceiverInit(nativeDir)
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            cont.resumeWithException(Exception("Failed to setup transceivers: ${e.message}"))
+            return@suspendCancellableCoroutine
+        }
+
+        val constraints = MediaConstraints()
+        pc.createOffer(object : SdpObserver {
+            override fun onCreateSuccess(sdp: SessionDescription) {
+                pc.setLocalDescription(object : SdpObserver {
+                    override fun onCreateSuccess(sdp: SessionDescription?) {}
+                    override fun onSetSuccess() {
+                        cont.resume(sdp.description)
+                    }
+                    override fun onCreateFailure(error: String?) {
+                        cont.resumeWithException(Exception("Failed to set local description: $error"))
+                    }
+                    override fun onSetFailure(error: String?) {
+                        cont.resumeWithException(Exception("Failed to set local description: $error"))
+                    }
+                }, sdp)
+            }
+            override fun onSetSuccess() {}
+            override fun onCreateFailure(error: String?) {
+                cont.resumeWithException(Exception("Failed to create offer: $error"))
+            }
+            override fun onSetFailure(error: String?) {}
+        }, constraints)
+    }
+
     actual fun setAudioEnabled(enabled: Boolean) {
         localAudioTrack?.setEnabled(enabled)
         _isAudioEnabled = enabled
@@ -597,13 +767,28 @@ actual class WebRTCClient {
 
     actual fun close() {
         listener = null
-        
+
+        // Video capture cleanup
+        try {
+            videoCapturer?.stopCapture()
+        } catch (_: Exception) {}
+        videoCapturer?.dispose()
+        videoCapturer = null
+        localVideoSource?.dispose()
+        localVideoSource = null
+        localVideoTrack?.dispose()
+        localVideoTrack = null
+        surfaceTextureHelper?.dispose()
+        surfaceTextureHelper = null
+
         localAudioTrack?.setEnabled(false)
         localAudioTrack?.dispose()
         localAudioTrack = null
         audioSource?.dispose()
         audioSource = null
 
+        currentVideoTrack?.removeSink(frameCapturingSink)
+        currentVideoTrack = null
         frameCapturingSink = null
         surfaceViewRenderer?.release()
         surfaceViewRenderer = null
@@ -625,6 +810,7 @@ actual class WebRTCClient {
         iceGatheringComplete = false
         _connectionState = WebRTCState.CLOSED
         _isAudioEnabled = true
+        _isVideoEnabled = true
         
         try {
             audioManager?.let { am ->

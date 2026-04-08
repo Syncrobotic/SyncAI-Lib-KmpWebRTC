@@ -19,7 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.syncrobotic.webrtc.session.SessionState
-import com.syncrobotic.webrtc.session.WhepSession
+import com.syncrobotic.webrtc.session.WebRTCSession
 
 /**
  * Maps [SessionState] to [PlayerState].
@@ -37,27 +37,15 @@ internal fun SessionState.toPlayerState(): PlayerState = when (this) {
 }
 
 /**
- * A [VideoPlayerController] backed by a [WhepSession].
+ * A [VideoPlayerController] backed by a [WebRTCSession].
  */
-internal class SessionVideoPlayerController(
-    private val session: WhepSession
+internal class WebRTCSessionVideoPlayerController(
+    private val session: WebRTCSession
 ) : VideoPlayerController {
-    override fun play() {
-        session.setAudioEnabled(true)
-    }
-
-    override fun pause() {
-        session.setAudioEnabled(false)
-    }
-
-    override fun stop() {
-        session.close()
-    }
-
-    override fun seekTo(positionMs: Long) {
-        // Not supported for live WebRTC streams
-    }
-
+    override fun play() { session.setAudioEnabled(true) }
+    override fun pause() { session.setAudioEnabled(false) }
+    override fun stop() { session.close() }
+    override fun seekTo(positionMs: Long) {}
     override val currentPosition: Long get() = 0L
     override val duration: Long get() = 0L
     override val isPlaying: Boolean
@@ -160,7 +148,7 @@ internal fun SessionStatusOverlay(
                 }
                 is SessionState.Error -> {
                     Text(
-                        text = "⚠",
+                        text = "\u26A0",
                         fontSize = 24.sp,
                         color = Color.Red
                     )

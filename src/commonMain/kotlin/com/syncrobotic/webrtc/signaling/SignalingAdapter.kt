@@ -10,8 +10,7 @@ import io.ktor.client.plugins.cookies.*
  * while Session classes consume this interface to manage PeerConnection lifecycle.
  *
  * Built-in adapters:
- * - [WhepSignalingAdapter] — WHEP HTTP signaling for receiving streams
- * - [WhipSignalingAdapter] — WHIP HTTP signaling for sending streams
+ * - [HttpSignalingAdapter] — HTTP signaling for WHEP, WHIP, and custom endpoints
  *
  * Custom adapters can implement this interface for proprietary signaling servers.
  */
@@ -55,8 +54,7 @@ interface SignalingAdapter {
 /**
  * Result of an SDP offer/answer exchange.
  *
- * Replaces the former `WhepSignaling.SessionResult`, `WhipSignaling.SessionResult`,
- * and `AnswerResult` with a single unified type.
+ * Unified result type for SDP offer/answer exchange.
  */
 data class SignalingResult(
     /** SDP answer from the remote peer */

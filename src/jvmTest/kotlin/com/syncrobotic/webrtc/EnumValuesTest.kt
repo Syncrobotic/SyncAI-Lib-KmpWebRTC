@@ -1,9 +1,7 @@
 package com.syncrobotic.webrtc
 
-import com.syncrobotic.webrtc.config.SignalingType
-import com.syncrobotic.webrtc.config.StreamProtocol
 import com.syncrobotic.webrtc.datachannel.DataChannelState
-import com.syncrobotic.webrtc.signaling.WhipErrorCode
+import com.syncrobotic.webrtc.signaling.SignalingErrorCode
 import kotlin.test.*
 
 /**
@@ -76,23 +74,6 @@ class EnumValuesTest {
     }
 
     @Test
-    fun `EV-06 StreamProtocol entries`() {
-        val entries = StreamProtocol.entries
-        assertEquals(3, entries.size)
-        assertTrue(entries.contains(StreamProtocol.RTSP))
-        assertTrue(entries.contains(StreamProtocol.HLS))
-        assertTrue(entries.contains(StreamProtocol.WEBRTC))
-    }
-
-    @Test
-    fun `EV-07 SignalingType entries`() {
-        val entries = SignalingType.entries
-        assertEquals(2, entries.size)
-        assertTrue(entries.contains(SignalingType.WHEP_HTTP))
-        assertTrue(entries.contains(SignalingType.WEBSOCKET))
-    }
-
-    @Test
     fun `EV-08 DataChannelState entries`() {
         val entries = DataChannelState.entries
         assertEquals(4, entries.size)
@@ -103,13 +84,13 @@ class EnumValuesTest {
     }
 
     @Test
-    fun `EV-09 WhipErrorCode entries`() {
-        val entries = WhipErrorCode.entries
+    fun `EV-09 SignalingErrorCode entries`() {
+        val entries = SignalingErrorCode.entries
         assertEquals(5, entries.size)
-        assertTrue(entries.contains(WhipErrorCode.NETWORK_ERROR))
-        assertTrue(entries.contains(WhipErrorCode.OFFER_REJECTED))
-        assertTrue(entries.contains(WhipErrorCode.ICE_CANDIDATE_FAILED))
-        assertTrue(entries.contains(WhipErrorCode.SESSION_TERMINATED))
-        assertTrue(entries.contains(WhipErrorCode.UNKNOWN))
+        assertTrue(entries.contains(SignalingErrorCode.NETWORK_ERROR))
+        assertTrue(entries.contains(SignalingErrorCode.OFFER_REJECTED))
+        assertTrue(entries.contains(SignalingErrorCode.ICE_CANDIDATE_FAILED))
+        assertTrue(entries.contains(SignalingErrorCode.SESSION_TERMINATED))
+        assertTrue(entries.contains(SignalingErrorCode.UNKNOWN))
     }
 }
