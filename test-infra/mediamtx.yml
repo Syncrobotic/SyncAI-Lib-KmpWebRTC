@@ -18,6 +18,17 @@ webrtcAddress: :8889
 api: yes
 apiAddress: :9997
 
+# Allow unauthenticated access for testing
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: api
+      - action: read
+      - action: publish
+      - action: playback
+
 # Paths — accept any stream name dynamically
 paths:
   all_others:
