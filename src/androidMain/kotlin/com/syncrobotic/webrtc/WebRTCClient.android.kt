@@ -325,10 +325,12 @@ actual class WebRTCClient {
      * Create a SurfaceViewRenderer for video display.
      */
     fun createSurfaceViewRenderer(context: Context): SurfaceViewRenderer {
+        android.util.Log.d("WebRTCClient", "createSurfaceViewRenderer, eglBase=$eglBase")
         val renderer = SurfaceViewRenderer(context).apply {
             init(eglBase?.eglBaseContext, null)
             setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
-            setEnableHardwareScaler(true)
+            setEnableHardwareScaler(false)
+            setZOrderMediaOverlay(true)
         }
         surfaceViewRenderer = renderer
         return renderer
@@ -348,6 +350,16 @@ actual class WebRTCClient {
     }
 
     private var frameCapturingSink: FrameCapturingSink? = null
+    private var currentVideoTrack: VideoTrack? = null
+
+    private fun attachVideoSink(track: VideoTrack) {
+        if (currentVideoTrack == track) return
+        currentVideoTrack?.removeSink(frameCapturingSink)
+        frameCapturingSink = FrameCapturingSink()
+        track.addSink(frameCapturingSink)
+        currentVideoTrack = track
+        android.util.Log.d("WebRTCClient", "attachVideoSink: attached sink to track ${track.id()}")
+    }
 
     private fun createPeerConnectionObserver(): PeerConnection.Observer {
         return object : PeerConnection.Observer {
@@ -411,9 +423,10 @@ actual class WebRTCClient {
             override fun onAddStream(stream: MediaStream) {
                 val videoTrackCount = stream.videoTracks.size
                 val audioTrackCount = stream.audioTracks.size
-                
+
+                android.util.Log.d("WebRTCClient", "onAddStream fired, videoTracks=$videoTrackCount, audioTracks=$audioTrackCount")
                 listener?.onRemoteStreamAdded()
-                
+
                 val tracks = mutableListOf<TrackInfo>()
                 stream.videoTracks.forEach { track ->
                     tracks.add(TrackInfo(
@@ -432,10 +445,9 @@ actual class WebRTCClient {
                     ))
                 }
                 listener?.onTracksChanged(videoTrackCount, audioTrackCount, tracks)
-                
+
                 if (stream.videoTracks.isNotEmpty()) {
-                    frameCapturingSink = FrameCapturingSink()
-                    stream.videoTracks[0].addSink(frameCapturingSink)
+                    attachVideoSink(stream.videoTracks[0])
                 }
             }
 
@@ -448,17 +460,17 @@ actual class WebRTCClient {
             override fun onRenegotiationNeeded() {}
 
             override fun onAddTrack(receiver: RtpReceiver, streams: Array<out MediaStream>) {
+                android.util.Log.d("WebRTCClient", "onAddTrack fired, kind=${receiver.track()?.kind()}")
                 if (receiver.track()?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND) {
-                    frameCapturingSink = FrameCapturingSink()
-                    (receiver.track() as? VideoTrack)?.addSink(frameCapturingSink)
+                    (receiver.track() as? VideoTrack)?.let { attachVideoSink(it) }
                 }
             }
 
             override fun onTrack(transceiver: RtpTransceiver) {
                 val track = transceiver.receiver.track()
+                android.util.Log.d("WebRTCClient", "onTrack fired, kind=${track?.kind()}")
                 if (track?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND) {
-                    frameCapturingSink = FrameCapturingSink()
-                    (track as? VideoTrack)?.addSink(frameCapturingSink)
+                    (track as? VideoTrack)?.let { attachVideoSink(it) }
                 }
             }
         }
@@ -777,6 +789,8 @@ actual class WebRTCClient {
         audioSource?.dispose()
         audioSource = null
 
+        currentVideoTrack?.removeSink(frameCapturingSink)
+        currentVideoTrack = null
         frameCapturingSink = null
         surfaceViewRenderer?.release()
         surfaceViewRenderer = null
