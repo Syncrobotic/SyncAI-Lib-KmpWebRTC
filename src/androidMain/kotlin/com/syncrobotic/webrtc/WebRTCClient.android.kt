@@ -144,16 +144,9 @@ actual class WebRTCClient {
             createPeerConnectionObserver()
         )
 
-        peerConnection?.addTransceiver(
-            MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO,
-            RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY)
-        )
+        // Transceivers are set up by createFlexibleOffer() — do not add them here
+        // to avoid duplicate m=video/m=audio sections in the SDP offer.
 
-        peerConnection?.addTransceiver(
-            MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO,
-            RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.RECV_ONLY)
-        )
-        
         configureSpeakerphone(context, true)
     }
     
@@ -174,9 +167,9 @@ actual class WebRTCClient {
 
         eglBase = EglBase.create()
 
-        // Create factory (each connection has its own factory for isolation)
+        // Create factory with video + audio support so SEND_VIDEO can encode camera frames
         PeerConnectionFactoryManager.ensureInitialized(context)
-        peerConnectionFactory = PeerConnectionFactoryManager.createForAudio(context)
+        peerConnectionFactory = PeerConnectionFactoryManager.createForVideoAndAudio(context, eglBase!!)
 
         val iceServers = config.iceServers.map { ice ->
             PeerConnection.IceServer.builder(ice.urls)
@@ -219,11 +212,10 @@ actual class WebRTCClient {
         localAudioTrack?.setEnabled(true)
         _isAudioEnabled = true
 
-        val streamId = "local-audio-stream"
-        localAudioTrack?.let { track ->
-            peerConnection?.addTrack(track, listOf(streamId))
-        }
-        
+        // NOTE: do NOT addTrack() here — createFlexibleOffer() will add the track
+        // via addTransceiver() with the correct direction. Adding twice creates
+        // duplicate transceivers that break ICE negotiation (stuck "connecting").
+
         configureSpeakerphone(context, true)
     }
     
@@ -270,10 +262,9 @@ actual class WebRTCClient {
         localVideoTrack?.setEnabled(true)
         _isVideoEnabled = true
 
-        // Add track to peer connection
-        localVideoTrack?.let { track ->
-            peerConnection?.addTrack(track, listOf("local-video-stream"))
-        }
+        // NOTE: do NOT addTrack() here — createFlexibleOffer() will add the track
+        // via addTransceiver() with the correct direction. Adding twice creates
+        // duplicate transceivers that cause video to not transmit.
 
         android.util.Log.d("WebRTCClient", "Camera capture initialized: ${config.width}x${config.height}@${config.fps}fps, device=$targetDeviceName")
     }
@@ -298,6 +289,20 @@ actual class WebRTCClient {
         _isVideoEnabled = enabled
     }
 
+    /**
+     * Enable or disable received (remote) video tracks.
+     */
+    fun setRemoteVideoEnabled(enabled: Boolean) {
+        peerConnection?.transceivers?.forEach { transceiver ->
+            if (transceiver.mediaType == org.webrtc.MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO &&
+                transceiver.direction == org.webrtc.RtpTransceiver.RtpTransceiverDirection.RECV_ONLY ||
+                transceiver.direction == org.webrtc.RtpTransceiver.RtpTransceiverDirection.SEND_RECV
+            ) {
+                (transceiver.receiver?.track() as? org.webrtc.VideoTrack)?.setEnabled(enabled)
+            }
+        }
+    }
+
     private fun configureSpeakerphone(context: Context, enabled: Boolean) {
         try {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -318,32 +323,41 @@ actual class WebRTCClient {
      * Create a SurfaceViewRenderer for video display.
      */
     fun createSurfaceViewRenderer(context: Context): SurfaceViewRenderer {
+        android.util.Log.d("WebRTCClient", "createSurfaceViewRenderer, eglBase=$eglBase")
         val renderer = SurfaceViewRenderer(context).apply {
             init(eglBase?.eglBaseContext, null)
             setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
-            setEnableHardwareScaler(true)
+            setEnableHardwareScaler(false)
+            setZOrderMediaOverlay(true)
         }
         surfaceViewRenderer = renderer
         return renderer
     }
 
-    private inner class FrameCapturingSink(private val targetSink: VideoSink?) : VideoSink {
+    private inner class FrameCapturingSink : VideoSink {
         override fun onFrame(frame: org.webrtc.VideoFrame) {
-            val width = frame.rotatedWidth
-            val height = frame.rotatedHeight
-
             listener?.onVideoFrame(VideoFrame(
-                width = width,
-                height = height,
+                width = frame.rotatedWidth,
+                height = frame.rotatedHeight,
                 timestampNs = frame.timestampNs,
                 nativeFrame = frame
             ))
-
-            targetSink?.onFrame(frame)
+            // Always use the current surfaceViewRenderer reference — handles late init
+            surfaceViewRenderer?.onFrame(frame)
         }
     }
 
     private var frameCapturingSink: FrameCapturingSink? = null
+    private var currentVideoTrack: VideoTrack? = null
+
+    private fun attachVideoSink(track: VideoTrack) {
+        if (currentVideoTrack == track) return
+        currentVideoTrack?.removeSink(frameCapturingSink)
+        frameCapturingSink = FrameCapturingSink()
+        track.addSink(frameCapturingSink)
+        currentVideoTrack = track
+        android.util.Log.d("WebRTCClient", "attachVideoSink: attached sink to track ${track.id()}")
+    }
 
     private fun createPeerConnectionObserver(): PeerConnection.Observer {
         return object : PeerConnection.Observer {
@@ -407,9 +421,10 @@ actual class WebRTCClient {
             override fun onAddStream(stream: MediaStream) {
                 val videoTrackCount = stream.videoTracks.size
                 val audioTrackCount = stream.audioTracks.size
-                
+
+                android.util.Log.d("WebRTCClient", "onAddStream fired, videoTracks=$videoTrackCount, audioTracks=$audioTrackCount")
                 listener?.onRemoteStreamAdded()
-                
+
                 val tracks = mutableListOf<TrackInfo>()
                 stream.videoTracks.forEach { track ->
                     tracks.add(TrackInfo(
@@ -428,10 +443,9 @@ actual class WebRTCClient {
                     ))
                 }
                 listener?.onTracksChanged(videoTrackCount, audioTrackCount, tracks)
-                
+
                 if (stream.videoTracks.isNotEmpty()) {
-                    frameCapturingSink = FrameCapturingSink(surfaceViewRenderer)
-                    stream.videoTracks[0].addSink(frameCapturingSink)
+                    attachVideoSink(stream.videoTracks[0])
                 }
             }
 
@@ -444,17 +458,17 @@ actual class WebRTCClient {
             override fun onRenegotiationNeeded() {}
 
             override fun onAddTrack(receiver: RtpReceiver, streams: Array<out MediaStream>) {
+                android.util.Log.d("WebRTCClient", "onAddTrack fired, kind=${receiver.track()?.kind()}")
                 if (receiver.track()?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND) {
-                    frameCapturingSink = FrameCapturingSink(surfaceViewRenderer)
-                    (receiver.track() as? VideoTrack)?.addSink(frameCapturingSink)
+                    (receiver.track() as? VideoTrack)?.let { attachVideoSink(it) }
                 }
             }
 
             override fun onTrack(transceiver: RtpTransceiver) {
                 val track = transceiver.receiver.track()
+                android.util.Log.d("WebRTCClient", "onTrack fired, kind=${track?.kind()}")
                 if (track?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND) {
-                    frameCapturingSink = FrameCapturingSink(surfaceViewRenderer)
-                    (track as? VideoTrack)?.addSink(frameCapturingSink)
+                    (track as? VideoTrack)?.let { attachVideoSink(it) }
                 }
             }
         }
@@ -773,6 +787,8 @@ actual class WebRTCClient {
         audioSource?.dispose()
         audioSource = null
 
+        currentVideoTrack?.removeSink(frameCapturingSink)
+        currentVideoTrack = null
         frameCapturingSink = null
         surfaceViewRenderer?.release()
         surfaceViewRenderer = null

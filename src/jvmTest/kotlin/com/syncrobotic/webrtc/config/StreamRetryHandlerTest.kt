@@ -1,7 +1,6 @@
 package com.syncrobotic.webrtc.config
 
-import com.syncrobotic.webrtc.signaling.WebSocketSignalingException
-import com.syncrobotic.webrtc.signaling.WhepException
+import com.syncrobotic.webrtc.signaling.SignalingException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -36,7 +35,7 @@ class StreamRetryHandlerTest {
         var callCount = 0
         val result = StreamRetryHandler.withRetry(config) {
             callCount++
-            if (callCount == 1) throw WhepException("fail")
+            if (callCount == 1) throw SignalingException(message = "fail")
             "ok"
         }
         assertEquals("ok", result)
@@ -49,7 +48,7 @@ class StreamRetryHandlerTest {
         val ex = assertFailsWith<StreamRetryExhaustedException> {
             StreamRetryHandler.withRetry(config) {
                 callCount++
-                throw WhepException("always fail")
+                throw SignalingException(message = "always fail")
             }
         }
         assertEquals(config.maxRetries + 1, callCount)
@@ -117,19 +116,19 @@ class StreamRetryHandlerTest {
     }
 
     @Test
-    fun `SRH-09 WhepException is retryable`() = runTest {
-        assertTrue(StreamRetryHandler.shouldRetry(WhepException("test"), config))
+    fun `SRH-09 SignalingException is retryable`() = runTest {
+        assertTrue(StreamRetryHandler.shouldRetry(SignalingException(message = "test"), config))
     }
 
     @Test
-    fun `SRH-10 WebSocketSignalingException is retryable`() = runTest {
-        assertTrue(StreamRetryHandler.shouldRetry(WebSocketSignalingException("test"), config))
+    fun `SRH-10 SignalingException is retryable`() = runTest {
+        assertTrue(StreamRetryHandler.shouldRetry(SignalingException(message = "test"), config))
     }
 
     @Test
     fun `SRH-11 retryOnError false means no retry`() = runTest {
         val noRetryConfig = config.copy(retryOnError = false)
-        assertFalse(StreamRetryHandler.shouldRetry(WhepException("test"), noRetryConfig))
+        assertFalse(StreamRetryHandler.shouldRetry(SignalingException(message = "test"), noRetryConfig))
         assertFalse(StreamRetryHandler.shouldRetry(RuntimeException("test"), noRetryConfig))
     }
 
@@ -144,7 +143,7 @@ class StreamRetryHandlerTest {
             }
         ) {
             callCount++
-            if (callCount <= 2) throw WhepException("fail")
+            if (callCount <= 2) throw SignalingException(message = "fail")
             "ok"
         }
         assertEquals(2, attempts.size) // 2 retries before success
@@ -163,11 +162,11 @@ class StreamRetryHandlerTest {
             }
         ) {
             callCount++
-            if (callCount <= 2) throw WhepException("fail $callCount")
+            if (callCount <= 2) throw SignalingException(message = "fail $callCount")
             "ok"
         }
         assertEquals(2, errors.size)
-        assertTrue(errors[0].second is WhepException)
+        assertTrue(errors[0].second is SignalingException)
     }
 
     @Test

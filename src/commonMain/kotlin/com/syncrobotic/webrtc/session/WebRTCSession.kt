@@ -22,13 +22,13 @@ import kotlinx.coroutines.flow.StateFlow
  * ## Examples
  *
  * ```kotlin
- * // Receive video + audio (equivalent to legacy WhepSession)
+ * // Receive video + audio
  * val session = WebRTCSession(
  *     signaling = HttpSignalingAdapter("https://server/stream/whep"),
  *     mediaConfig = MediaConfig.RECEIVE_VIDEO
  * )
  *
- * // Send camera + mic (equivalent to legacy WhipSession + video)
+ * // Send camera + mic
  * val session = WebRTCSession(
  *     signaling = HttpSignalingAdapter("https://server/stream/whip"),
  *     mediaConfig = MediaConfig.SEND_VIDEO
@@ -87,6 +87,9 @@ expect class WebRTCSession(
 
     /** Enable/disable incoming audio playback. Only effective when `mediaConfig.receiveAudio = true`. */
     fun setAudioEnabled(enabled: Boolean)
+
+    /** Enable/disable incoming video rendering. Only effective when `mediaConfig.receiveVideo = true`. */
+    fun setRemoteVideoEnabled(enabled: Boolean)
 
     /** Toggle speakerphone output (mobile platforms only). */
     fun setSpeakerphoneEnabled(enabled: Boolean)

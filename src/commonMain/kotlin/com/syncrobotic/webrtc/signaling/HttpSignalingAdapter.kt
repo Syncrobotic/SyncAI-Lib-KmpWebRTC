@@ -45,7 +45,7 @@ class SignalingException(
  * 3. **DELETE** to tear down the session
  *
  * Since WHEP and WHIP use the exact same HTTP flow (only the endpoint URL differs),
- * this single adapter replaces both `WhepSignalingAdapter` and `WhipSignalingAdapter`.
+ * a single adapter handles both protocols.
  *
  * ```kotlin
  * // Receiving (WHEP endpoint)
@@ -157,5 +157,92 @@ class HttpSignalingAdapter(
         } catch (_: Exception) {
             // Ignore errors on teardown
         }
+    }
+}
+
+// ── Internal helpers ────────────────────────────────────────────────────
+
+/**
+ * Resolve a potentially relative Location header to an absolute URL.
+ */
+internal fun resolveResourceUrl(baseUrl: String, location: String?): String? {
+    if (location.isNullOrBlank()) return null
+    if (location.startsWith("http://") || location.startsWith("https://")) return location
+
+    val base = Url(baseUrl)
+    return URLBuilder(base).apply { encodedPath = location }.buildString()
+}
+
+/**
+ * Build an SDP fragment for a trickle ICE PATCH request.
+ */
+internal fun buildSdpFragment(
+    candidate: String,
+    iceUfrag: String?,
+    icePwd: String?,
+    mid: String?
+): String {
+    val lines = mutableListOf<String>()
+    if (!iceUfrag.isNullOrBlank()) lines.add("a=ice-ufrag:$iceUfrag")
+    if (!icePwd.isNullOrBlank()) lines.add("a=ice-pwd:$icePwd")
+    if (!mid.isNullOrBlank()) lines.add("a=mid:$mid")
+    lines.add(candidate.trimEnd())
+    return lines.joinToString("\r\n", postfix = "\r\n")
+}
+
+/**
+ * Parse `Link` headers with `rel="ice-server"` into [IceServer] instances.
+ */
+internal fun parseIceServerLinks(headers: Headers): List<IceServer> {
+    val linkHeaders = headers.getAll(HttpHeaders.Link) ?: return emptyList()
+    return linkHeaders
+        .filter { it.contains("rel=\"ice-server\"") }
+        .mapNotNull { link ->
+            val urlMatch = Regex("<([^>]+)>").find(link)
+            urlMatch?.groupValues?.get(1)?.let { IceServer(urls = listOf(it)) }
+        }
+}
+
+/**
+ * Apply per-request authentication headers.
+ */
+internal fun HttpRequestBuilder.applyAuth(auth: SignalingAuth) {
+    when (auth) {
+        is SignalingAuth.None -> { /* no-op */ }
+        is SignalingAuth.Bearer -> header(HttpHeaders.Authorization, "Bearer ${auth.token}")
+        is SignalingAuth.Cookies -> {
+            val cookieString = auth.cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+            header(HttpHeaders.Cookie, cookieString)
+        }
+        is SignalingAuth.CookieStorage -> { /* handled by HttpCookies plugin on client */ }
+        is SignalingAuth.Custom -> auth.headers.forEach { (k, v) -> header(k, v) }
+    }
+}
+
+/**
+ * Create a default [HttpClient] with optional [HttpCookies] plugin.
+ */
+internal fun createDefaultClient(auth: SignalingAuth): HttpClient {
+    return HttpClient {
+        if (auth is SignalingAuth.CookieStorage) {
+            install(HttpCookies) {
+                storage = auth.storage
+            }
+        }
+    }
+}
+
+/**
+ * Wrap an existing [HttpClient] to install [HttpCookies] if needed.
+ */
+internal fun HttpClient.withAuth(auth: SignalingAuth): HttpClient {
+    return if (auth is SignalingAuth.CookieStorage) {
+        this.config {
+            install(HttpCookies) {
+                storage = auth.storage
+            }
+        }
+    } else {
+        this
     }
 }

@@ -176,17 +176,7 @@ interface WebRTCListener {
     fun onAudioData(data: AudioData) {}
     
     /** Called when an error occurs */
-    @Deprecated(
-        message = "Use onError(Throwable) for richer error context. Will be removed in v3.0.",
-        replaceWith = ReplaceWith("onError(Throwable)")
-    )
-    fun onError(error: String) {}
-
-    /** Called when an error occurs */
-    fun onError(error: Throwable) {
-        @Suppress("DEPRECATION")
-        onError(error.message ?: error.toString())
-    }
+    fun onError(error: Throwable) {}
     
     /** Called when remote stream is added */
     fun onRemoteStreamAdded() {}
@@ -203,13 +193,10 @@ interface WebRTCListener {
 }
 
 /**
- * Cross-platform WebRTC client interface.
- * Platform implementations will wrap native WebRTC libraries.
+ * Cross-platform WebRTC client — internal engine used by [WebRTCSession].
+ *
+ * Not intended for direct use by application code. Use [WebRTCSession] instead.
  */
-@Deprecated(
-    message = "Use WhepSession/WhipSession instead. Will become internal in v3.0.",
-    replaceWith = ReplaceWith("WhepSession or WhipSession", "com.syncrobotic.webrtc.session.WhepSession", "com.syncrobotic.webrtc.session.WhipSession")
-)
 expect class WebRTCClient {
     /**
      * Initialize the WebRTC client with configuration.

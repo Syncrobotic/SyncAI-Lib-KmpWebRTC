@@ -462,6 +462,13 @@ actual class WebRTCClient {
         _isVideoEnabled = enabled
     }
 
+    /**
+     * Enable or disable the received (remote) video track.
+     */
+    fun setRemoteVideoEnabled(enabled: Boolean) {
+        videoTrack?.isEnabled = enabled
+    }
+
     private fun configureAudioSession() {
         val audioSession = RTCAudioSession.sharedInstance()
         audioSession.lockForConfiguration()

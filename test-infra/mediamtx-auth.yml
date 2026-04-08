@@ -1,0 +1,23 @@
+###############################################
+# MediaMTX Configuration — With Authentication
+# Used for: S-1 auth tests
+###############################################
+
+logLevel: info
+
+rtsp: yes
+rtspAddress: :8554
+
+webrtc: yes
+webrtcAddress: :8889
+
+api: yes
+apiAddress: :9997
+
+# Authentication — require publish/read credentials
+paths:
+  all_others:
+    publishUser: publisher
+    publishPass: publisher123
+    readUser: viewer
+    readPass: viewer123

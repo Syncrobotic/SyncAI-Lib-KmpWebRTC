@@ -99,6 +99,41 @@ object PeerConnectionFactoryManager {
     }
     
     /**
+     * Create a NEW PeerConnectionFactory for video sending (camera + optional audio).
+     * Used for SEND_VIDEO, VIDEO_CALL, BIDIRECTIONAL_AUDIO — any mode that sends video.
+     *
+     * Combines DefaultVideoEncoderFactory + DefaultVideoDecoderFactory + JavaAudioDeviceModule
+     * so the factory can handle both video encoding and high-quality audio (AEC/NS).
+     *
+     * @param context Application context (for AudioDeviceModule)
+     * @param eglBase EglBase for video encoding/decoding
+     */
+    fun createForVideoAndAudio(context: Context, eglBase: EglBase): PeerConnectionFactory {
+        synchronized(lock) {
+            val encoderFactory = DefaultVideoEncoderFactory(
+                eglBase.eglBaseContext,
+                true,
+                true
+            )
+            val decoderFactory = DefaultVideoDecoderFactory(eglBase.eglBaseContext)
+            val audioModule = org.webrtc.audio.JavaAudioDeviceModule.builder(context.applicationContext)
+                .setUseHardwareAcousticEchoCanceler(true)
+                .setUseHardwareNoiseSuppressor(true)
+                .createAudioDeviceModule()
+
+            val factory = PeerConnectionFactory.builder()
+                .setVideoEncoderFactory(encoderFactory)
+                .setVideoDecoderFactory(decoderFactory)
+                .setAudioDeviceModule(audioModule)
+                .createPeerConnectionFactory()
+
+            activeConnections++
+            Log.d(TAG, "Created new PeerConnectionFactory (video+audio), activeConnections=$activeConnections")
+            return factory
+        }
+    }
+
+    /**
      * Dispose a PeerConnectionFactory and update active connection count.
      * 
      * @param factory The factory to dispose (caller is responsible for passing their own factory)

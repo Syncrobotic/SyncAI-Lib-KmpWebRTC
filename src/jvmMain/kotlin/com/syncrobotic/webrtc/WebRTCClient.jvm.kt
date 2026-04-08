@@ -26,6 +26,7 @@ actual class WebRTCClient {
     private var localAudioSource: dev.onvoid.webrtc.media.audio.AudioTrackSource? = null
     private var localAudioTrack: dev.onvoid.webrtc.media.audio.AudioTrack? = null
     private var localVideoTrack: VideoTrack? = null
+    private var remoteVideoTrack: VideoTrack? = null
     private var localVideoSource: dev.onvoid.webrtc.media.video.VideoDeviceSource? = null
     private var videoCaptureDevice: dev.onvoid.webrtc.media.video.VideoDevice? = null
     private var _isVideoEnabled = true
@@ -198,6 +199,10 @@ actual class WebRTCClient {
         _isVideoEnabled = enabled
     }
 
+    fun setRemoteVideoEnabled(enabled: Boolean) {
+        remoteVideoTrack?.setEnabled(enabled)
+    }
+
     private fun createPeerConnectionObserver(): PeerConnectionObserver {
         return object : PeerConnectionObserver {
             override fun onSignalingChange(state: RTCSignalingState) {}
@@ -285,6 +290,7 @@ actual class WebRTCClient {
                 val receiver = transceiver.receiver
                 val track = receiver.track
                 if (track is VideoTrack) {
+                    remoteVideoTrack = track
                     track.addSink(object : VideoTrackSink {
                         override fun onVideoFrame(frame: dev.onvoid.webrtc.media.video.VideoFrame) {
                             val width = frame.buffer.width

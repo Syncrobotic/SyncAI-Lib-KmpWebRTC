@@ -16,6 +16,7 @@ plugins {
     alias(webrtcLibs.plugins.kotlinCocoapods)
     alias(webrtcLibs.plugins.kotlinSerialization)
     `maven-publish`
+    id("org.jetbrains.kotlinx.kover") version "0.9.1"
 }
 
 group = "com.syncrobotic"
@@ -106,6 +107,11 @@ kotlin {
                 implementation(webrtcLibs.ktor.server.core)
                 implementation(webrtcLibs.ktor.server.netty)
                 implementation(webrtcLibs.ktor.server.content.negotiation)
+                implementation(webrtcLibs.ktor.server.websockets)
+
+                // E2E: Testcontainers for MediaMTX Docker
+                implementation(webrtcLibs.testcontainers)
+                implementation(webrtcLibs.testcontainers.junit)
             }
         }
         
@@ -199,6 +205,43 @@ tasks.withType<PublishToMavenRepository>().configureEach {
 
 tasks.withType<PublishToMavenLocal>().configureEach {
     onlyIf { publication.name !in excludedPublications }
+}
+
+// Testcontainers + Docker Engine 29+ compatibility
+// docker-java defaults to API 1.32, but Docker 29+ requires >= 1.44
+tasks.withType<Test>().configureEach {
+    testLogging { events("passed", "skipped", "failed", "standardOut", "standardError") }
+    // Exclude manual-only test servers that block indefinitely (skip for runSignalingProxy task itself)
+    if (name != "runSignalingProxy") exclude("**/SignalingProxyServerTest*")
+    // docker-java reads: system prop "api.version" → env "DOCKER_API_VERSION"
+    environment("DOCKER_API_VERSION", "1.44")
+    systemProperty("api.version", "1.44")
+    // Colima socket path for macOS (when using Colima instead of Docker Desktop)
+    val colimaSocket = file("${System.getProperty("user.home")}/.colima/default/docker.sock")
+    if (colimaSocket.exists()) {
+        environment("DOCKER_HOST", "unix://${colimaSocket.absolutePath}")
+        environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
+    }
+}
+
+// Dedicated task for manually starting SignalingProxy server (excluded from normal jvmTest)
+tasks.register<Test>("runSignalingProxy") {
+    description = "Starts the SignalingProxy server manually (blocks until Ctrl+C)"
+    group = "verification"
+    val jvmTestTask = tasks.named<Test>("jvmTest").get()
+    classpath = jvmTestTask.classpath
+    testClassesDirs = jvmTestTask.testClassesDirs
+    filter {
+        includeTestsMatching("com.syncrobotic.webrtc.level3.server.SignalingProxyServerTest")
+    }
+    testLogging { events("standardOut", "standardError") }
+    environment("DOCKER_API_VERSION", "1.44")
+    systemProperty("api.version", "1.44")
+    val colimaSocket = file("${System.getProperty("user.home")}/.colima/default/docker.sock")
+    if (colimaSocket.exists()) {
+        environment("DOCKER_HOST", "unix://${colimaSocket.absolutePath}")
+        environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
+    }
 }
 
 // Auto-configure git hooks path on first build (like Husky for JS)

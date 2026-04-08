@@ -1,7 +1,7 @@
 package com.syncrobotic.webrtc.session
 
 /**
- * Connection state of [WhepSession] / [WhipSession], exposed as `StateFlow<SessionState>`.
+ * Connection state of [WebRTCSession], exposed as `StateFlow<SessionState>`.
  *
  * State transitions:
  * ```
