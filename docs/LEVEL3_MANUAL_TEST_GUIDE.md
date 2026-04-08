@@ -87,11 +87,15 @@ docker compose ps
 
 預期輸出：
 ```
-NAME              STATUS    PORTS
-mediamtx          running   0.0.0.0:8554->8554, 0.0.0.0:8889->8889
-pion-iot          running   0.0.0.0:8080->8080
-ffmpeg-source     running   (推流中，無對外 port)
+NAME                   STATUS    PORTS
+mediamtx               running   0.0.0.0:8554->8554, 0.0.0.0:8889->8889
+pion-iot               running   0.0.0.0:8080->8080
+ffmpeg-source          running   (推流中，無對外 port)
+ffmpeg-pion-source     running   (推流中，無對外 port)
+ffmpeg-pion-dc-source  running   (推流中，無對外 port)
 ```
+
+> **注意**：`ffmpeg-pion-source` 和 `ffmpeg-pion-dc-source` 需等 `pion-iot` healthcheck 通過才會啟動（約 5~10 秒）。
 
 ### Step 2: 確認服務健康
 
@@ -103,9 +107,18 @@ curl http://localhost:9997/v3/config/global/get
 curl http://localhost:8080/health
 
 # 確認 FFmpeg 正在推流到 MediaMTX
-# MediaMTX 的 API 可查看活躍的 paths
 curl http://localhost:9997/v3/paths/list
+
+# 確認 FFmpeg 有成功推流到 Pion (應看到 WHIP session 記錄)
+docker logs ffmpeg-pion-source 2>&1 | tail -5
+docker logs pion-iot 2>&1 | grep "whip" | tail -10
 ```
+
+> **Pion 影像來源說明**：
+> - `ffmpeg-pion-source` 推 H.264 到 `pion-iot:8080/iot-camera/whip`
+> - `ffmpeg-pion-dc-source` 推 H.264 到 `pion-iot:8080/dc-test/whip`
+> - 兩者啟動後，Pion 變成 SFU 模式，WHEP 訂閱者會收到真實的 FFmpeg 測試畫面
+> - 若 FFmpeg 尚未啟動，Pion 會 fallback 到內建 test pattern（VP8 bitstream 無效 → 黑畫面）
 
 ### Step 3: 啟動 SignalingProxyServer (JVM in-process)
 
@@ -1050,3 +1063,75 @@ docker run --rm --network host linuxserver/ffmpeg \
 | Pion WHEP 收看 | `http://<HOST>:8080/{stream}/whep` |
 | Pion WHIP 推流 | `http://<HOST>:8080/{stream}/whip` |
 | Signaling Proxy | `http://<HOST>:9090/api/v1/devices/{deviceId}/offer` |
+
+### 已驗證的 Pion 端點
+
+| 端點 | 模式 | 影像來源 | 用途 |
+|------|------|----------|------|
+| `8080/iot-camera/whep` | RECEIVE_VIDEO | ffmpeg-pion-source | IoT 攝影機模擬 |
+| `8080/dc-test/whip` | SEND_AUDIO | ffmpeg-pion-dc-source | DataChannel echo 測試（必須用 WHIP） |
+| `8080/dc-test/whep` | RECEIVE_VIDEO | ffmpeg-pion-dc-source | DataChannel + 影像（WHEP，Show Video） |
+
+> **DataChannel Echo 注意**：Pion 只在 WHIP session（`setupWHIP`）設定 `OnDataChannel`，WHEP session 不 echo app 建立的 channel。測試 echo 必須連 WHIP 端點。
+
+---
+
+## Troubleshooting
+
+### Pion 黑畫面
+
+**症狀**：連線 Connected 但 VideoRenderer 全黑。
+
+**原因**：`ffmpeg-pion-source` / `ffmpeg-pion-dc-source` 尚未推流，Pion fallback 到無效的 VP8 test pattern。
+
+**診斷**：
+```bash
+# 確認 FFmpeg 容器有在跑
+docker ps | grep ffmpeg-pion
+
+# 查看 FFmpeg 是否推流成功（找 "frame=" 或確認無 "Conversion failed"）
+docker logs ffmpeg-pion-source 2>&1 | tail -20
+
+# 確認 Pion 有收到 WHIP session
+docker logs pion-iot 2>&1 | grep "whip"
+```
+
+**常見錯誤**：
+```
+[WHIP muxer] Unsupported video codec vp8 by RTC, choose h264
+→ 必須用 H.264，不能用 VP8
+
+[WHIP muxer] Unsupported audio channels 1 by RTC, choose stereo
+→ 音訊必須是 stereo，加 -ac 2
+```
+
+**修復**：
+```bash
+# 重啟 FFmpeg → Pion 的推流
+docker compose restart ffmpeg-pion-source ffmpeg-pion-dc-source
+
+# 或從頭重啟全部
+docker compose down && docker compose up -d
+```
+
+---
+
+### DataChannel 無 echo
+
+**症狀**：發訊息後看不到 echo 回來。
+
+**原因**：在 WHEP 模式下，Pion 的 `setupWHEP` 不設定 `OnDataChannel`，app 建立的 channel Pion 不處理。
+
+**修復**：DataChannel echo 測試必須使用 **WHIP 模式**：
+- URL: `http://<HOST>:8080/dc-test/whip`
+- Mode: WHIP (Send)
+
+---
+
+### Multi-View 黑畫面 + reconnect loop
+
+**症狀**：連線 Connected 但黑畫面，log 顯示不斷重連。
+
+**原因**：同時呼叫 `session.connect()` 和 VideoRenderer 自動 connect，兩次 `client.initialize()` 建立兩個 PeerConnection → reconnect loop。
+
+**修復**：連線 VideoRenderer 的 session 時，不要手動呼叫 `session.connect()`，讓 VideoRenderer 的 `LaunchedEffect` 處理。

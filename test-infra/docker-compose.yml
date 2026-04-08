@@ -66,6 +66,45 @@ services:
         -f rtsp rtsp://mediamtx:8554/iot-camera
     restart: unless-stopped
 
+  # ─── FFmpeg → Pion WHIP Source ──────────────────────────
+  # Pushes real test video to pion-iot via WHIP so WHEP subscribers get actual frames.
+  # Requires FFmpeg 6.1+ (linuxserver/ffmpeg:latest should qualify).
+  ffmpeg-pion-source:
+    image: linuxserver/ffmpeg:latest
+    container_name: ffmpeg-pion-source
+    depends_on:
+      pion-iot:
+        condition: service_healthy
+    entrypoint: >
+      ffmpeg
+        -re
+        -f lavfi -i "testsrc2=size=640x480:rate=30:duration=86400"
+        -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=86400"
+        -vf "format=yuv420p"
+        -c:v libx264 -profile:v baseline -level:v 3.1 -preset ultrafast -tune zerolatency -b:v 500k
+        -c:a libopus -b:a 64k -ac 2
+        -f whip http://pion-iot:8080/iot-camera/whip
+    restart: unless-stopped
+
+  # ─── FFmpeg → Pion WHIP Source (dc-test) ───────────────
+  # Provides video stream for dc-test/whep (DataChannel screen with showVideo)
+  ffmpeg-pion-dc-source:
+    image: linuxserver/ffmpeg:latest
+    container_name: ffmpeg-pion-dc-source
+    depends_on:
+      pion-iot:
+        condition: service_healthy
+    entrypoint: >
+      ffmpeg
+        -re
+        -f lavfi -i "testsrc2=size=640x480:rate=30:duration=86400"
+        -f lavfi -i "sine=frequency=880:sample_rate=48000:duration=86400"
+        -vf "format=yuv420p"
+        -c:v libx264 -profile:v baseline -level:v 3.1 -preset ultrafast -tune zerolatency -b:v 500k
+        -c:a libopus -b:a 64k -ac 2
+        -f whip http://pion-iot:8080/dc-test/whip
+    restart: unless-stopped
+
   # ─── Pion WebRTC IoT Server ─────────────────────────────
   # Simulates IoT device with WebRTC + DataChannel
   # Modes: iot (default), sfu, bidirectional
