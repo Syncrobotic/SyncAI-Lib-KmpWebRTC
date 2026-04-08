@@ -212,11 +212,10 @@ actual class WebRTCClient {
         localAudioTrack?.setEnabled(true)
         _isAudioEnabled = true
 
-        val streamId = "local-audio-stream"
-        localAudioTrack?.let { track ->
-            peerConnection?.addTrack(track, listOf(streamId))
-        }
-        
+        // NOTE: do NOT addTrack() here — createFlexibleOffer() will add the track
+        // via addTransceiver() with the correct direction. Adding twice creates
+        // duplicate transceivers that break ICE negotiation (stuck "connecting").
+
         configureSpeakerphone(context, true)
     }
     
@@ -263,10 +262,9 @@ actual class WebRTCClient {
         localVideoTrack?.setEnabled(true)
         _isVideoEnabled = true
 
-        // Add track to peer connection
-        localVideoTrack?.let { track ->
-            peerConnection?.addTrack(track, listOf("local-video-stream"))
-        }
+        // NOTE: do NOT addTrack() here — createFlexibleOffer() will add the track
+        // via addTransceiver() with the correct direction. Adding twice creates
+        // duplicate transceivers that cause video to not transmit.
 
         android.util.Log.d("WebRTCClient", "Camera capture initialized: ${config.width}x${config.height}@${config.fps}fps, device=$targetDeviceName")
     }
