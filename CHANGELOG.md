@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.0.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.4.1...v2.0.0) (2026-04-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* The following deprecated classes and functions have been removed:
+
+### Features
+
+* add AudioPlayer composable for receiving remote audio ([8a7734c](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/8a7734c8dd95660116fc8178236f7ee52cae04f0))
+* add camera capture support for all platforms (Android/iOS/JVM) ([cc9c866](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/cc9c86672f5e7b79ecd16031c93280964b14909b))
+* add CameraPreview composable for local camera display ([b74d2f7](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/b74d2f74796b86feb8d5e8baa2ae650653cd0c4d))
+* add Level 3 manual test infrastructure for server/client architecture tests ([bf5bfd8](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/bf5bfd822d6fe63a20d6c31c08e7b1e9f90cde84))
+* add setRemoteVideoEnabled for incoming video control ([7609e84](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/7609e849e83a79e0b5ba87c9e2bc691494ed1801))
+* add unified WebRTCSession with flexible media direction support ([1e6958d](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/1e6958d0d70c483f909d1ed1cdaf7be0e2c37fe4))
+* expose public callbacks for custom video rendering ([b6dbdef](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/b6dbdefe37bbd4bf5ca4ee83a3f8e9f329eef3c4))
+* implement E2E test infrastructure and 7 test classes ([af2c356](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/af2c3567e8be5228587ba605f3369b9e746e69dd))
+* remove all deprecated APIs — unified WebRTCSession is now the only public API ([6b0bf65](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/6b0bf65f8523171e1ab09b624dce1ab4bffc94cc))
+
+
+### Bug Fixes
+
+* **android:** remove duplicate addTrack() causing send audio/video failure ([7ac0c37](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/7ac0c372a6969634ac396b32b637813079ca882b))
+* **android:** resolve green screen flashing in VideoRenderer ([448a719](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/448a71939e0281fb5673f12f5bf613f22edeff6e))
+* disable mediamtx API auth for testing ([dd4e391](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/dd4e391959d0bb9952e41fddabf969a678b49c57))
+* level 3 infra didn't work ([255afaf](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/255afaf6965b13c01c550d41a70baeedc05275bd))
+* resolve Android green screen and SEND_VIDEO connection failure ([f341345](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/f341345603598442a96c15b7e5ad6342e1d87e6f))
+* resolve Testcontainers + Docker Engine 29 compatibility ([1f8677a](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/1f8677a5abf3cd9e44853ba6e9aca3bf29549c69))
+* **test-infra:** pion SFU keeps forwarding when a subscriber disconnects ([314dc6c](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/314dc6c09d901ac49f1832a00c432563eb033ee4))
+* use WebRTC port for mediamtx healthcheck ([e0d0cd7](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/e0d0cd7461aa3acbe40c21e52e1cefcf02f3da4f))
+
 ## [1.4.1](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.4.0...v1.4.1) (2026-04-01)
 
 
