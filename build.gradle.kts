@@ -210,6 +210,7 @@ tasks.withType<PublishToMavenLocal>().configureEach {
 // Testcontainers + Docker Engine 29+ compatibility
 // docker-java defaults to API 1.32, but Docker 29+ requires >= 1.44
 tasks.withType<Test>().configureEach {
+    testLogging { events("passed", "skipped", "failed", "standardOut", "standardError") }
     // docker-java reads: system prop "api.version" → env "DOCKER_API_VERSION"
     environment("DOCKER_API_VERSION", "1.44")
     systemProperty("api.version", "1.44")
