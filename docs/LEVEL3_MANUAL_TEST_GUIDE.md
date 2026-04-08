@@ -10,13 +10,13 @@
 | S-1b IoT → MediaMTX → App | 4 | 6 | S1b-03, S1b-04 未測 |
 | S-2 BE Signaling Proxy | 6 | 6 | ✅ 全通 |
 | S-3 Pion SFU | 4 | 4 | ✅ 全通 |
-| S-5 Dual Session IoT | 0 | 3 | ⏳ 需 DataChannel UI |
-| C-1 Bidirectional Call | 0 | 5 | ⏳ 需 VIDEO_CALL / DataChannel UI |
-| C-2 External IoT | 3 | 5 | C2-03, C2-04 需新功能 |
-| C-3 Multiple VideoRenderer | 0 | 4 | ⏳ 需 App 新功能 |
+| S-5 Dual Session IoT | 0 | 3 | ⏳ DualSessionScreen 未確認測試 |
+| C-1 Bidirectional Call | 0 | 5 | ⏳ 需 server 支援雙向 PeerConnection |
+| C-2 External IoT | 4 | 5 | C2-04 未測（需 DualSessionScreen） |
+| C-3 Multiple VideoRenderer | 4 | 4 | ✅ 全通 |
 | C-4 1-to-N | 4 | 4 | ✅ 全通 |
-| C-5 DataChannel | 0 | 5 | ⏳ 需 DataChannel UI |
-| **合計** | **25** | **47** | **~53%** |
+| C-5 DataChannel | 5 | 5 | ✅ 全通 |
+| **合計** | **35** | **47** | **~74%** |
 
 > 圖例：✅ Pass　⚠️ Partial　⏳ 待測（需新功能）　⬜ 待測
 
