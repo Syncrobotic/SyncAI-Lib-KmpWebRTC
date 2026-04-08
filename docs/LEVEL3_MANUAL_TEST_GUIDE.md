@@ -127,7 +127,8 @@ docker logs pion-iot 2>&1 | grep "whip" | tail -10
 cd SyncAI-Lib-KmpWebRTC/
 
 # 啟動 Signaling Proxy（跑在 JVM 裡，用於 S-2, S-5 測試）
-./gradlew jvmTest --tests "com.syncrobotic.webrtc.level3.server.SignalingProxyServerTest"
+./gradlew runSignalingProxy
+# ./gradlew jvmTest --tests "com.syncrobotic.webrtc.level3.server.SignalingProxyServerTest"
 ```
 
 或者在測試 App 中直接啟動 proxy（如果 App 內建此功能）。
