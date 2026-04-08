@@ -6,8 +6,8 @@
 
 | 群組 | 通過 | 總數 | 狀態 |
 |------|------|------|------|
-| S-1a MediaMTX ↔ App | 4 | 5 | S1a-05 未測 |
-| S-1b IoT → MediaMTX → App | 4 | 6 | S1b-03, S1b-04 未測 |
+| S-1a MediaMTX ↔ App | 5 | 5 | ✅ 全通 |
+| S-1b IoT → MediaMTX → App | 6 | 6 | ✅ 全通 |
 | S-2 BE Signaling Proxy | 6 | 6 | ✅ 全通 |
 | S-3 Pion SFU | 4 | 4 | ✅ 全通 |
 | S-5 Dual Session IoT | 3 | 3 | ✅ 全通 |
@@ -16,7 +16,7 @@
 | C-3 Multiple VideoRenderer | 4 | 4 | ✅ 全通 |
 | C-4 1-to-N | 4 | 4 | ✅ 全通 |
 | C-5 DataChannel | 5 | 5 | ✅ 全通 |
-| **合計** | **39** | **47** | **~83%** |
+| **合計** | **42** | **47** | **~89%** |
 
 > 圖例：✅ Pass　⚠️ Partial　⏳ 待測（需新功能）　⬜ 待測
 
@@ -244,7 +244,7 @@ cd SyncAI-Lib-KmpWebRTC/
 - App B, App C, 瀏覽器 都看到 App A 的畫面
 - App A 的 stats 正常（推流不受多觀眾影響）
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -297,7 +297,7 @@ curl http://localhost:9997/v3/paths/list
 - App A 同時收到視訊 + 推送音訊
 - App B 收到 App A 的音訊
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
@@ -312,7 +312,7 @@ curl http://localhost:9997/v3/paths/list
 **驗證：**
 - 三端都看到 FFmpeg 測試畫面
 
-**結果：** ⬜ Pass / ⬜ Fail
+**結果：** ✅ Pass
 
 ---
 
