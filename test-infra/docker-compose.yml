@@ -29,7 +29,7 @@ services:
       - ./mediamtx.yml:/mediamtx.yml
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9997/v3/config/global/get"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8889/"]
       interval: 5s
       timeout: 3s
       retries: 5
