@@ -1066,11 +1066,14 @@ docker run --rm --network host linuxserver/ffmpeg \
 
 ### 已驗證的 Pion 端點
 
-| 端點 | 模式 | 影像來源 | 用途 |
-|------|------|----------|------|
-| `8080/iot-camera/whep` | RECEIVE_VIDEO | ffmpeg-pion-source | IoT 攝影機模擬 |
-| `8080/dc-test/whip` | SEND_AUDIO | ffmpeg-pion-dc-source | DataChannel echo 測試（必須用 WHIP） |
-| `8080/dc-test/whep` | RECEIVE_VIDEO | ffmpeg-pion-dc-source | DataChannel + 影像（WHEP，Show Video） |
+| 端點 | 有 FFmpeg 推流 | 影像來源 service | 用途 |
+|------|--------------|-----------------|------|
+| `8080/iot-camera/whep` | ✅ | ffmpeg-pion-source | IoT 攝影機模擬 |
+| `8080/dc-test/whip` | ✅ | ffmpeg-pion-dc-source | DataChannel echo 測試（必須用 WHIP） |
+| `8080/dc-test/whep` | ✅ | ffmpeg-pion-dc-source | DataChannel + 影像（WHEP，Show Video） |
+| `8080/{其他任意 stream}/whep` | ❌ | 無 | **黑畫面**（Pion fallback 到無效 VP8） |
+
+> **Pion 黑畫面根本原因**：沒有 WHIP publisher 時，Pion 會 fallback 到自帶的手刻 VP8 test pattern，但該 bitstream 缺少 frame tag，decoder 無法解碼 → 黑畫面。只有 `iot-camera` 和 `dc-test` 兩個 stream 有 FFmpeg 推流，其餘 stream（如 `stream-1`、`sfu-stream`、`iot-video` 等）都會是黑畫面。
 
 > **DataChannel Echo 注意**：Pion 只在 WHIP session（`setupWHIP`）設定 `OnDataChannel`，WHEP session 不 echo app 建立的 channel。測試 echo 必須連 WHIP 端點。
 
