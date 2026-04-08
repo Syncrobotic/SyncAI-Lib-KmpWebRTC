@@ -236,7 +236,9 @@ func setupWHIP(pc *webrtc.PeerConnection, session *Session, stream string) {
 		}
 		streamsMu.Unlock()
 
-		// Forward RTP packets
+		// Forward RTP packets to all subscribers.
+		// Ignore write errors (a subscriber may have disconnected) so the
+		// forwarding loop keeps running for the remaining subscribers.
 		buf := make([]byte, 1500)
 		for {
 			n, _, err := track.Read(buf)
@@ -245,7 +247,7 @@ func setupWHIP(pc *webrtc.PeerConnection, session *Session, stream string) {
 				return
 			}
 			if _, err = localTrack.Write(buf[:n]); err != nil {
-				return
+				log.Printf("[%s] Write error (subscriber may have disconnected): %v", session.ID, err)
 			}
 		}
 	})
