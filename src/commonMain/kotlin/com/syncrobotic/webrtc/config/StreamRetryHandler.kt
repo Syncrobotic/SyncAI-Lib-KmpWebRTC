@@ -23,7 +23,7 @@ object StreamRetryHandler {
     suspend fun <T> withRetry(
         config: RetryConfig,
         actionName: String = "connection",
-        onAttempt: (attempt: Int, maxAttempts: Int, delayMs: Long) -> Unit = { _, _, _ -> },
+        onAttempt: (attempt: Int, maxAttempts: Int?, delayMs: Long) -> Unit = { _, _, _ -> },
         onRetryError: (attempt: Int, error: Throwable) -> Unit = { _, _ -> },
         block: suspend (attempt: Int) -> T
     ): T {
@@ -61,7 +61,7 @@ object StreamRetryHandler {
                 val delayMs = config.calculateDelay(attempt - 1)
                 val displayMaxRetries = if (isUnlimited) "unlimited" else "${maxAttempts - 1}"
                 println("[StreamRetryHandler] [$actionName] Retrying in ${delayMs}ms (attempt $attempt/$displayMaxRetries)")
-                onAttempt(attempt, if (isUnlimited) Int.MAX_VALUE else maxAttempts - 1, delayMs)
+                onAttempt(attempt, if (isUnlimited) null else maxAttempts - 1, delayMs)
                 onRetryError(attempt, e)
                 delay(delayMs)
             }

@@ -20,10 +20,14 @@ sealed class SessionState {
     /** WebRTC connected, media flowing. */
     data object Connected : SessionState()
 
-    /** Connection lost, attempting reconnection. */
+    /**
+     * Connection lost, attempting reconnection.
+     * @param attempt Current retry attempt number (1-indexed)
+     * @param maxAttempts Maximum number of retry attempts, or `null` for unlimited retries
+     */
     data class Reconnecting(
         val attempt: Int,
-        val maxAttempts: Int
+        val maxAttempts: Int?
     ) : SessionState()
 
     /** Connection error. Check [isRetryable] for recovery possibility. */

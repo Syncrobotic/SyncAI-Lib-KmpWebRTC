@@ -47,6 +47,20 @@ class SessionStateTest {
         assertNotEquals(a, c)
     }
 
+    @Test
+    fun `SS-06a Reconnecting with null maxAttempts for unlimited retries`() {
+        val state = SessionState.Reconnecting(attempt = 7, maxAttempts = null)
+        assertEquals(7, state.attempt)
+        assertNull(state.maxAttempts)
+    }
+
+    @Test
+    fun `SS-06b Reconnecting null vs non-null maxAttempts not equal`() {
+        val unlimited = SessionState.Reconnecting(1, null)
+        val limited = SessionState.Reconnecting(1, 5)
+        assertNotEquals(unlimited, limited)
+    }
+
     // ── Error ──────────────────────────────────────────────────────────
 
     @Test
