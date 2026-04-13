@@ -19,7 +19,7 @@ sealed class AudioPushState {
     /** Attempting to reconnect after connection loss */
     data class Reconnecting(
         val attempt: Int,
-        val maxAttempts: Int
+        val maxAttempts: Int?
     ) : AudioPushState()
     
     /** Connection failed */
