@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.1](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v2.0.0...v2.0.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* avoid displaying Int.MAX_VALUE in reconnecting UI for unlimited retries ([2b17b9e](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/2b17b9e1919110cd058943d562cdafafed9c7c03))
+* update AudioPushState and AudioPlaybackState Reconnecting to use nullable maxAttempts ([25a565c](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/25a565cea1c0a53ec6143fa94593e39a44374788))
+* use nullable maxAttempts in Reconnecting states to avoid displaying Int.MAX_VALUE ([dfe52b2](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/dfe52b229b62275fc9fba4f3899c171c680c16fc))
+
 ## [2.0.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v1.4.1...v2.0.0) (2026-04-08)
 
 
