@@ -134,7 +134,7 @@ class StreamRetryHandlerTest {
 
     @Test
     fun `SRH-12 onAttempt callback called with correct args`() = runTest {
-        val attempts = mutableListOf<Triple<Int, Int, Long>>()
+        val attempts = mutableListOf<Triple<Int, Int?, Long>>()
         var callCount = 0
         StreamRetryHandler.withRetry(
             config = config,
@@ -149,6 +149,30 @@ class StreamRetryHandlerTest {
         assertEquals(2, attempts.size) // 2 retries before success
         assertEquals(1, attempts[0].first) // first retry attempt = 1
         assertEquals(config.maxRetries, attempts[0].second) // maxAttempts
+    }
+
+    @Test
+    fun `SRH-12a onAttempt with unlimited retries passes null maxAttempts`() = runTest {
+        val attempts = mutableListOf<Triple<Int, Int?, Long>>()
+        val unlimitedConfig = RetryConfig.PERSISTENT.copy(
+            initialDelayMs = 10L,
+            maxDelayMs = 50L
+        )
+        var callCount = 0
+        StreamRetryHandler.withRetry(
+            config = unlimitedConfig,
+            onAttempt = { attempt, maxAttempts, delayMs ->
+                attempts.add(Triple(attempt, maxAttempts, delayMs))
+            }
+        ) {
+            callCount++
+            if (callCount <= 2) throw SignalingException(message = "fail")
+            "ok"
+        }
+        assertEquals(2, attempts.size)
+        assertEquals(1, attempts[0].first)
+        assertNull(attempts[0].second, "maxAttempts should be null for unlimited retries")
+        assertNull(attempts[1].second, "maxAttempts should be null for unlimited retries")
     }
 
     @Test

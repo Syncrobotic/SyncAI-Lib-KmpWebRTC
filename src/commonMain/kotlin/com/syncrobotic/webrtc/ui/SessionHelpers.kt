@@ -74,7 +74,10 @@ internal fun SessionVideoPlaceholder(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = if (sessionState is SessionState.Reconnecting)
-                            "Reconnecting (${sessionState.attempt}/${sessionState.maxAttempts})..."
+                            if (sessionState.maxAttempts == null)
+                                "Reconnecting (${sessionState.attempt})..."
+                            else
+                                "Reconnecting (${sessionState.attempt}/${sessionState.maxAttempts})..."
                         else
                             "Connecting...",
                         color = Color.White,
@@ -140,7 +143,10 @@ internal fun SessionStatusOverlay(
                     CircularProgressIndicator(color = Color(0xFFFFA500), strokeWidth = 2.dp)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Reconnecting (${sessionState.attempt}/${sessionState.maxAttempts})...",
+                        text = if (sessionState.maxAttempts == null)
+                            "Reconnecting (${sessionState.attempt})..."
+                        else
+                            "Reconnecting (${sessionState.attempt}/${sessionState.maxAttempts})...",
                         color = Color(0xFFFFA500),
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center

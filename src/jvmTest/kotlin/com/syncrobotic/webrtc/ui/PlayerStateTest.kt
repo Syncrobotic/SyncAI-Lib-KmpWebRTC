@@ -54,6 +54,11 @@ class PlayerStateTest {
     }
 
     @Test
+    fun `PS-09a Reconnecting displayName with unlimited retries`() {
+        assertEquals("Reconnecting (3)...", PlayerState.Reconnecting(3, null).displayName)
+    }
+
+    @Test
     fun `PS-10 Error message accessible`() {
         val error = PlayerState.Error("fail")
         assertEquals("fail", error.message)
@@ -71,5 +76,19 @@ class PlayerStateTest {
         assertEquals(10, state.maxAttempts)
         assertEquals("network", state.reason)
         assertEquals(5000L, state.nextRetryMs)
+    }
+
+    @Test
+    fun `PS-12 Reconnecting unlimited retries has null maxAttempts`() {
+        val state = PlayerState.Reconnecting(
+            attempt = 5,
+            maxAttempts = null,
+            reason = "reconnect",
+            nextRetryMs = 8000L
+        )
+        assertEquals(5, state.attempt)
+        assertNull(state.maxAttempts)
+        assertEquals("reconnect", state.reason)
+        assertEquals(8000L, state.nextRetryMs)
     }
 }
