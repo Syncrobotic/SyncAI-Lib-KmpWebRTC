@@ -48,7 +48,7 @@ sealed class AudioPlaybackState {
     data object Muted : AudioPlaybackState()
 
     /** Reconnecting after a connection loss. */
-    data class Reconnecting(val attempt: Int, val maxAttempts: Int) : AudioPlaybackState()
+    data class Reconnecting(val attempt: Int, val maxAttempts: Int?) : AudioPlaybackState()
 
     /** An error occurred. */
     data class Error(val message: String, val cause: Throwable? = null) : AudioPlaybackState()

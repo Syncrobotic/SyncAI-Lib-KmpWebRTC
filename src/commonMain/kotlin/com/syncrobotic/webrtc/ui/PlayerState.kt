@@ -28,10 +28,16 @@ sealed interface PlayerState {
     /** Player encountered an error */
     data class Error(val message: String, val cause: Throwable? = null) : PlayerState
     
-    /** Player is attempting to reconnect after a failure or disconnection */
+    /**
+     * Player is attempting to reconnect after a failure or disconnection.
+     * @param attempt Current retry attempt number (1-indexed)
+     * @param maxAttempts Maximum number of retry attempts, or `null` for unlimited retries
+     * @param reason Optional reason for reconnection
+     * @param nextRetryMs Time until next retry in milliseconds
+     */
     data class Reconnecting(
         val attempt: Int,
-        val maxAttempts: Int,
+        val maxAttempts: Int?,
         val reason: String = "",
         val nextRetryMs: Long = 0
     ) : PlayerState
@@ -47,7 +53,7 @@ sealed interface PlayerState {
             is Buffering -> "Buffering ${percent}%"
             is Stopped -> "Stopped"
             is Error -> "Error"
-            is Reconnecting -> "Reconnecting ($attempt/$maxAttempts)..."
+            is Reconnecting -> if (maxAttempts == null) "Reconnecting ($attempt)..." else "Reconnecting ($attempt/$maxAttempts)..."
         }
 }
 
