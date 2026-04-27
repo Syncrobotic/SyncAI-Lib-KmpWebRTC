@@ -77,12 +77,15 @@ class HttpSignalingAdapter(
     // ── SignalingAdapter ────────────────────────────────────────────────
 
     override suspend fun sendOffer(sdpOffer: String): SignalingResult {
+        println("[HttpSignalingAdapter] sendOffer() url=$url, sdpOffer length=${sdpOffer.length}, auth=${auth::class.simpleName}")
         try {
+            println("[HttpSignalingAdapter] POSTing to $url ...")
             val response = client.post(url) {
                 contentType(ContentType("application", "sdp"))
                 applyAuth(auth)
                 setBody(sdpOffer)
             }
+            println("[HttpSignalingAdapter] POST response status=${response.status}")
 
             if (response.status != HttpStatusCode.Created && response.status != HttpStatusCode.OK) {
                 throw SignalingException(
@@ -105,6 +108,8 @@ class HttpSignalingAdapter(
         } catch (e: SignalingException) {
             throw e
         } catch (e: Exception) {
+            println("[HttpSignalingAdapter] sendOffer() exception: ${e::class.simpleName}: ${e.message}")
+            e.printStackTrace()
             throw SignalingException(
                 code = SignalingErrorCode.NETWORK_ERROR,
                 message = "Failed to send signaling offer: ${e.message}",
@@ -220,10 +225,11 @@ internal fun HttpRequestBuilder.applyAuth(auth: SignalingAuth) {
 }
 
 /**
- * Create a default [HttpClient] with optional [HttpCookies] plugin.
+ * Create a default [HttpClient] using the platform-specific engine,
+ * with optional [HttpCookies] plugin.
  */
 internal fun createDefaultClient(auth: SignalingAuth): HttpClient {
-    return HttpClient {
+    return createPlatformHttpClient {
         if (auth is SignalingAuth.CookieStorage) {
             install(HttpCookies) {
                 storage = auth.storage
@@ -231,6 +237,22 @@ internal fun createDefaultClient(auth: SignalingAuth): HttpClient {
         }
     }
 }
+
+/**
+ * Create an [HttpClient] using the platform-specific engine.
+ *
+ * Each platform provides the correct engine automatically:
+ * - Android: OkHttp
+ * - iOS: Darwin
+ * - JVM: CIO
+ * - JS: Js
+ *
+ * This prevents engine auto-discovery issues when multiple engines
+ * are on the classpath (e.g., CIO being picked on iOS instead of Darwin).
+ */
+internal expect fun createPlatformHttpClient(
+    block: io.ktor.client.HttpClientConfig<*>.() -> Unit = {}
+): HttpClient
 
 /**
  * Wrap an existing [HttpClient] to install [HttpCookies] if needed.

@@ -71,13 +71,16 @@ private class PeerConnectionDelegate(
     override fun peerConnection(
         peerConnection: RTCPeerConnection,
         didChangeSignalingState: RTCSignalingState
-    ) { /* no-op */ }
+    ) {
+        println("[WebRTCClient] [iOS] Signaling state changed: $didChangeSignalingState")
+    }
     
     @ObjCSignatureOverride
     override fun peerConnection(
         peerConnection: RTCPeerConnection,
         didAddStream: RTCMediaStream
     ) {
+        println("[WebRTCClient] [iOS] Stream added: videoTracks=${didAddStream.videoTracks.size}, audioTracks=${didAddStream.audioTracks.size}")
         dispatch_async(dispatch_get_main_queue()) {
             client.handleStreamAdded(didAddStream)
         }
@@ -134,6 +137,7 @@ private class PeerConnectionDelegate(
         peerConnection: RTCPeerConnection,
         didGenerateIceCandidate: RTCIceCandidate
     ) {
+        println("[WebRTCClient] [iOS] ICE candidate generated: ${didGenerateIceCandidate.sdp.take(80)}")
         client.listener?.onIceCandidate(
             candidate = didGenerateIceCandidate.sdp,
             sdpMid = didGenerateIceCandidate.sdpMid,
@@ -158,6 +162,7 @@ private class PeerConnectionDelegate(
         peerConnection: RTCPeerConnection,
         didChangeConnectionState: RTCPeerConnectionState
     ) {
+        println("[WebRTCClient] [iOS] PeerConnection state changed: $didChangeConnectionState")
         client.updateConnectionState(didChangeConnectionState)
     }
     
@@ -167,6 +172,7 @@ private class PeerConnectionDelegate(
         didAddReceiver: RTCRtpReceiver,
         streams: List<*>
     ) {
+        println("[WebRTCClient] [iOS] Receiver added: mediaType=${didAddReceiver.track?.kind}, streams=${streams.size}")
         client.handleReceiverAdded(didAddReceiver)
     }
     
@@ -224,6 +230,10 @@ actual class WebRTCClient {
         get() = _isAudioEnabled
 
     actual fun initialize(config: WebRTCConfig, listener: WebRTCListener) {
+        println("[WebRTCClient] [iOS] initialize() called, iceServers=${config.iceServers.size}, iceTransportPolicy=${config.iceTransportPolicy}")
+        config.iceServers.forEachIndexed { i, server ->
+            println("[WebRTCClient] [iOS]   iceServer[$i]: urls=${server.urls}, username=${server.username}, hasCredential=${server.credential != null}")
+        }
         this.listener = listener
         
         // Create factory (each connection has its own factory for isolation)
@@ -270,20 +280,8 @@ actual class WebRTCClient {
             ),
             delegate = peerConnectionDelegate
         )
-        
-        peerConnection?.addTransceiverOfType(
-            RTCRtpMediaType.RTCRtpMediaTypeVideo,
-            init = RTCRtpTransceiverInit().apply {
-                direction = RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionRecvOnly
-            }
-        )
-        
-        peerConnection?.addTransceiverOfType(
-            RTCRtpMediaType.RTCRtpMediaTypeAudio,
-            init = RTCRtpTransceiverInit().apply {
-                direction = RTCRtpTransceiverDirection.RTCRtpTransceiverDirectionRecvOnly
-            }
-        )
+        println("[WebRTCClient] [iOS] PeerConnection created: ${peerConnection != null}")
+        // Transceivers are set up by createFlexibleOffer() — do not add them here
     }
     
     /**
@@ -626,6 +624,7 @@ actual class WebRTCClient {
         mediaConfig: com.syncrobotic.webrtc.config.MediaConfig
     ): String = suspendCancellableCoroutine { cont ->
         val pc = peerConnection
+        println("[WebRTCClient] [iOS] createFlexibleOffer() called, pc=${pc != null}, videoDir=${mediaConfig.videoDirection}, audioDir=${mediaConfig.audioDirection}")
         if (pc == null) {
             cont.resumeWithException(Exception("PeerConnection not initialized"))
             return@suspendCancellableCoroutine
@@ -710,6 +709,7 @@ actual class WebRTCClient {
                     if (setError != null) {
                         cont.resumeWithException(Exception("Failed to set local description: ${setError.localizedDescription}"))
                     } else {
+                        println("[WebRTCClient] [iOS] Offer created and set as local desc, sdp length=${sessionDescription.sdp.length}")
                         cont.resume(sessionDescription.sdp)
                     }
                 }
@@ -738,6 +738,7 @@ actual class WebRTCClient {
     actual fun isSpeakerphoneEnabled(): Boolean = _isSpeakerphoneEnabled
 
     actual suspend fun setRemoteAnswer(sdpAnswer: String) = suspendCancellableCoroutine { cont ->
+        println("[WebRTCClient] [iOS] setRemoteAnswer() called, sdp length=${sdpAnswer.length}")
         val sessionDescription = RTCSessionDescription(
             type = RTCSdpType.RTCSdpTypeAnswer,
             sdp = sdpAnswer
@@ -745,8 +746,10 @@ actual class WebRTCClient {
         
         peerConnection?.setRemoteDescription(sessionDescription) { error ->
             if (error != null) {
+                println("[WebRTCClient] [iOS] setRemoteAnswer FAILED: ${error.localizedDescription}")
                 cont.resumeWithException(Exception("Failed to set remote answer: ${error.localizedDescription}"))
             } else {
+                println("[WebRTCClient] [iOS] setRemoteAnswer succeeded")
                 cont.resume(Unit)
             }
         }
