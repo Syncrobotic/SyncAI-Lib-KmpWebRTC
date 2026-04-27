@@ -58,7 +58,7 @@ actual class WebRTCSession actual constructor(
 
     actual suspend fun connect() {
         if (closed) return
-        println("[WebRTCSession] [iOS] connect() called, mediaConfig=$mediaConfig, retryConfig=$retryConfig")
+        println("[WebRTCSession] [iOS] connect() called, mediaConfig=$mediaConfig, webrtcConfig.iceServers=${webrtcConfig.iceServers.size}, iceServers=${webrtcConfig.iceServers}, retryConfig=$retryConfig")
         _state.value = SessionState.Connecting
 
         try {
@@ -133,18 +133,26 @@ actual class WebRTCSession actual constructor(
         }
 
         // Create offer with flexible media directions
+        println("[WebRTCSession] [iOS] Creating flexible offer, mediaConfig=$mediaConfig")
         val localSdp = client.createFlexibleOffer(mediaConfig)
+        println("[WebRTCSession] [iOS] Local SDP created, length=${localSdp.length}, iceMode=${webrtcConfig.iceMode}")
+        println("[WebRTCSession] [iOS] SDP preview: ${localSdp.take(200)}")
 
         // For FULL_ICE, wait for gathering then use local description with candidates
         val offerSdp = if (webrtcConfig.iceMode == IceMode.FULL_ICE) {
             delay(webrtcConfig.iceGatheringTimeoutMs.coerceAtMost(10_000L))
-            client.getLocalDescription() ?: localSdp
+            val gathered = client.getLocalDescription()
+            println("[WebRTCSession] [iOS] FULL_ICE: gathered localDesc length=${gathered?.length}")
+            gathered ?: localSdp
         } else {
             localSdp
         }
 
+        println("[WebRTCSession] [iOS] Sending offer to signaling, sdp length=${offerSdp.length}")
         val result = signaling.sendOffer(offerSdp)
+        println("[WebRTCSession] [iOS] Got signaling answer, sdpAnswer length=${result.sdpAnswer.length}, resourceUrl=${result.resourceUrl}")
         client.setRemoteAnswer(result.sdpAnswer)
+        println("[WebRTCSession] [iOS] Remote answer set successfully")
         resourceUrl = result.resourceUrl
 
         // Apply initial mute state
