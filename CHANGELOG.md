@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v2.0.1...v2.1.0) (2026-04-27)
+
+
+### Features
+
+* use custom http engine for different platform ([2f07e0a](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/2f07e0a37d96945c6779201b87f2b76a865d2f5c))
+* use custom http engine for different platform ([6909bf5](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/6909bf560ea6174cc9011d1fcde16ebc1f1a6be8))
+
 ## [2.0.1](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v2.0.0...v2.0.1) (2026-04-14)
 
 
