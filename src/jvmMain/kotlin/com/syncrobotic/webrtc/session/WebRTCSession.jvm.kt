@@ -271,7 +271,9 @@ actual class WebRTCSession actual constructor(
         statsJob = null
         if (terminate) {
             resourceUrl?.let { url ->
-                scope.launch {
+                // Launch on an independent scope so the DELETE request is not
+                // cancelled by the upcoming scope.cancel() in close().
+                CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                     try { signaling.terminate(url) } catch (_: Exception) { }
                 }
             }
