@@ -151,9 +151,12 @@ actual class WebRTCSession actual constructor(
         println("[WebRTCSession] [iOS] Sending offer to signaling, sdp length=${offerSdp.length}")
         val result = signaling.sendOffer(offerSdp)
         println("[WebRTCSession] [iOS] Got signaling answer, sdpAnswer length=${result.sdpAnswer.length}, resourceUrl=${result.resourceUrl}")
+        // Record resourceUrl BEFORE setRemoteAnswer: the server allocated the
+        // resource at this point, so close() must be able to DELETE it even
+        // if setRemoteAnswer hangs.
+        resourceUrl = result.resourceUrl
         client.setRemoteAnswer(result.sdpAnswer)
         println("[WebRTCSession] [iOS] Remote answer set successfully")
-        resourceUrl = result.resourceUrl
 
         // Apply initial mute state
         if (muted && mediaConfig.sendAudio) {

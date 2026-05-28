@@ -1,5 +1,7 @@
 package com.syncrobotic.webrtc.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
@@ -53,15 +55,18 @@ actual fun VideoRenderer(
 
     // Render video or placeholder
     val view = videoView
-    if (view != null) {
-        key(view) {
-            UIKitView(
-                factory = { view },
-                modifier = modifier,
-            )
+    Box(modifier = modifier.fillMaxSize()) {
+        if (view != null) {
+            key(view) {
+                UIKitView(
+                    factory = { view },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            SessionStatusOverlay(sessionState)
+        } else {
+            SessionVideoPlaceholder(sessionState, Modifier)
         }
-    } else {
-        SessionVideoPlaceholder(sessionState, modifier)
     }
 
     // Cleanup
