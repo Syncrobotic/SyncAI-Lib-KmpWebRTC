@@ -217,7 +217,26 @@ class E2E1VideoReceiveTest : E2ETestBase() {
         )
 
         val connectJob = session.launchConnect()
-        session.awaitSettled()
+
+        // Wait for the offer to actually reach the server (concrete signal that
+        // sendOffer() returned and the session has a resourceUrl). awaitSettled
+        // is unreliable here because mock SDP never drives state to Connected,
+        // and a bare 10s timeout can race with FULL_ICE's pre-offer gathering
+        // delay — leaving close() to run while sendOffer is still in-flight.
+        val offerDeadline = System.currentTimeMillis() + 15_000
+        while (System.currentTimeMillis() < offerDeadline &&
+            server.recordedRequests.none { it.method == "POST" }
+        ) {
+            Thread.sleep(50)
+        }
+        assertNotNull(
+            server.recordedRequests.find { it.method == "POST" },
+            "Expected POST offer to reach mock server before close()"
+        )
+        // Allow the connect() coroutine to assign resourceUrl after sendOffer
+        // returns (POST is recorded by the server before the HTTP response is
+        // sent back to the client).
+        Thread.sleep(200)
 
         session.close()
         assertEquals(SessionState.Closed, session.state.value)
