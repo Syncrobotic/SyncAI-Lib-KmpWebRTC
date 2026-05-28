@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.1](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v2.1.0...v2.1.1) (2026-05-28)
+
+
+### Bug Fixes
+
+* assign resourceUrl before setRemoteAnswer so close() can DELETE ([6e22cdb](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/6e22cdbab19435c83fb83c004ec2d892bdd3634b))
+* launch signaling.terminate on independent scope so DELETE is not cancelled ([c1b9c6b](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/c1b9c6bcb2d4738ae271814ec8ef8beb2e98f194))
+* prevent HTTP DELETE cancellation in WebRTCSession.close() ([c048d21](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/c048d215a4b6a937f7c0f977c2111fccfe19a907))
+* show connecting/reconnecting overlay on iOS and Android VideoRenderer ([57bd24b](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/57bd24bba35f46308cf9e2a09d28442cdb15e03a))
+
 ## [2.1.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v2.0.1...v2.1.0) (2026-04-27)
 
 
