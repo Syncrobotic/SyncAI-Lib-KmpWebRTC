@@ -1,6 +1,8 @@
 package com.syncrobotic.webrtc.ui
 
 import android.view.ViewGroup
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -53,22 +55,25 @@ actual fun VideoRenderer(
 
     // Render video or placeholder
     val renderer = surfaceViewRenderer
-    if (renderer != null) {
-        key(renderer) {
-            AndroidView(
-                factory = {
-                    renderer.apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
-                    }
-                },
-                modifier = modifier
-            )
+    Box(modifier = modifier.fillMaxSize()) {
+        if (renderer != null) {
+            key(renderer) {
+                AndroidView(
+                    factory = {
+                        renderer.apply {
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            SessionStatusOverlay(sessionState)
+        } else {
+            SessionVideoPlaceholder(sessionState, Modifier)
         }
-    } else {
-        SessionVideoPlaceholder(sessionState, modifier)
     }
 
     // Cleanup callback on dispose

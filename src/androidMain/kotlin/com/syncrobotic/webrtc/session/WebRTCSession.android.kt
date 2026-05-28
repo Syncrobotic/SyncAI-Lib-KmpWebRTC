@@ -162,8 +162,11 @@ actual class WebRTCSession actual constructor(
         }
 
         val result = signaling.sendOffer(offerSdp)
-        client.setRemoteAnswer(result.sdpAnswer)
+        // Record resourceUrl BEFORE setRemoteAnswer: the server allocated the
+        // resource at this point, so close() must be able to DELETE it even
+        // if setRemoteAnswer hangs.
         resourceUrl = result.resourceUrl
+        client.setRemoteAnswer(result.sdpAnswer)
 
         // Apply initial mute state
         if (muted && mediaConfig.sendAudio) {
@@ -305,7 +308,9 @@ actual class WebRTCSession actual constructor(
         statsJob = null
         if (terminate) {
             resourceUrl?.let { url ->
-                scope.launch {
+                // Launch on an independent scope so the DELETE request is not
+                // cancelled by the upcoming scope.cancel() in close().
+                CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                     try { signaling.terminate(url) } catch (_: Exception) { }
                 }
             }
