@@ -222,6 +222,20 @@ class E2E1VideoReceiveTest : E2ETestBase() {
         session.close()
         assertEquals(SessionState.Closed, session.state.value)
 
+        // Regression: close() must complete the DELETE (signaling.terminate)
+        // even though it cancels the session scope. The DELETE is launched on
+        // an independent scope, so poll briefly for it to reach the server.
+        val deadline = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < deadline &&
+            server.recordedRequests.none { it.method == "DELETE" }
+        ) {
+            Thread.sleep(50)
+        }
+        assertNotNull(
+            server.recordedRequests.find { it.method == "DELETE" },
+            "Expected DELETE request to mock server after session.close()"
+        )
+
         connectJob.cancel()
     }
 
