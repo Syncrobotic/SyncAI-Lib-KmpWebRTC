@@ -33,7 +33,9 @@ enum class SignalingErrorCode {
 class SignalingException(
     val code: SignalingErrorCode = SignalingErrorCode.UNKNOWN,
     message: String,
-    cause: Throwable? = null
+    cause: Throwable? = null,
+    /** HTTP status returned by the signaling server, if the failure was an HTTP response. */
+    val httpStatus: Int? = null
 ) : Exception(message, cause)
 
 /**
@@ -90,7 +92,8 @@ class HttpSignalingAdapter(
             if (response.status != HttpStatusCode.Created && response.status != HttpStatusCode.OK) {
                 throw SignalingException(
                     code = SignalingErrorCode.OFFER_REJECTED,
-                    message = "Signaling offer failed with status ${response.status.value}: ${response.bodyAsText()}"
+                    message = "Signaling offer failed with status ${response.status.value}: ${response.bodyAsText()}",
+                    httpStatus = response.status.value
                 )
             }
 

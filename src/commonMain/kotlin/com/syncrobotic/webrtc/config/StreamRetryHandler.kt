@@ -86,10 +86,25 @@ object StreamRetryHandler {
             is IllegalArgumentException -> false
             is UnsupportedOperationException -> false
             is NotImplementedError -> false
-            is SignalingException -> true
+            is SignalingException -> isRetryableSignaling(error)
             is StreamRetryExhaustedException -> false
             else -> true
         }
+    }
+
+    /** 4xx statuses worth retrying despite being client errors (transient / eventually-available). */
+    private val RETRYABLE_4XX = setOf(404, 408, 425, 429)
+
+    /**
+     * A signaling failure is retryable unless the server permanently rejected the request.
+     * 4xx (e.g. 406 unsupported media, 400 bad offer) will keep failing on identical retries,
+     * so we give up immediately instead of hammering the device. 404/408/425/429 and 5xx
+     * are treated as transient. A null status means a network/transport error → retry.
+     */
+    private fun isRetryableSignaling(error: SignalingException): Boolean {
+        val status = error.httpStatus ?: return true
+        if (status in 400..499 && status !in RETRYABLE_4XX) return false
+        return true
     }
 }
 
