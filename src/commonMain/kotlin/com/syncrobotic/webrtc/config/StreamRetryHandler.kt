@@ -31,7 +31,7 @@ object StreamRetryHandler {
         val maxAttempts = if (isUnlimited) Int.MAX_VALUE else config.maxRetries + 1
         var lastException: Throwable? = null
 
-        println("[StreamRetryHandler] [$actionName] Starting with maxRetries=${if (isUnlimited) "unlimited" else config.maxRetries}, initialDelay=${config.initialDelayMs}ms, backoff=${config.backoffFactor}")
+        println("${WebRtcLog.ts()} [StreamRetryHandler] [$actionName] Starting with maxRetries=${if (isUnlimited) "unlimited" else config.maxRetries}, initialDelay=${config.initialDelayMs}ms, backoff=${config.backoffFactor}")
 
         var attempt = 0
         while (true) {
@@ -40,27 +40,27 @@ object StreamRetryHandler {
             if (!isUnlimited && attempt > maxAttempts) break
 
             try {
-                println("[StreamRetryHandler] [$actionName] Attempt #$attempt")
+                println("${WebRtcLog.ts()} [StreamRetryHandler] [$actionName] Attempt #$attempt")
                 return block(attempt)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
                 lastException = e
-                println("[StreamRetryHandler] [$actionName] Attempt #$attempt failed: ${e::class.simpleName}: ${e.message}")
+                println("${WebRtcLog.ts()} [StreamRetryHandler] [$actionName] Attempt #$attempt failed: ${e::class.simpleName}: ${e.message}")
 
                 if (!shouldRetry(e, config)) {
-                    println("[StreamRetryHandler] [$actionName] Error is not retryable, giving up")
+                    println("${WebRtcLog.ts()} [StreamRetryHandler] [$actionName] Error is not retryable, giving up")
                     throw e
                 }
 
                 if (!isUnlimited && attempt >= maxAttempts) {
-                    println("[StreamRetryHandler] [$actionName] All $maxAttempts attempts exhausted")
+                    println("${WebRtcLog.ts()} [StreamRetryHandler] [$actionName] All $maxAttempts attempts exhausted")
                     break
                 }
 
                 val delayMs = config.calculateDelay(attempt - 1)
                 val displayMaxRetries = if (isUnlimited) "unlimited" else "${maxAttempts - 1}"
-                println("[StreamRetryHandler] [$actionName] Retrying in ${delayMs}ms (attempt $attempt/$displayMaxRetries)")
+                println("${WebRtcLog.ts()} [StreamRetryHandler] [$actionName] Retrying in ${delayMs}ms (attempt $attempt/$displayMaxRetries)")
                 onAttempt(attempt, if (isUnlimited) null else maxAttempts - 1, delayMs)
                 onRetryError(attempt, e)
                 delay(delayMs)
