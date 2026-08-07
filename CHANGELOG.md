@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.1.2](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v2.1.1...v2.1.2) (2026-08-07)
+
+
+### Bug Fixes
+
+* stop retrying permanent 4xx signaling rejections ([2bc3d4e](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/2bc3d4e257e16d4b660eb857aedae52d40440aa0))
+* stop retrying permanent 4xx signaling rejections ([da735a0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/da735a03724c5406eb560b26bf54e1735de24c38))
+
+
+### Performance Improvements
+
+* gather-complete gating for FULL_ICE offer + timestamped webrtc logs ([5888343](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/588834355c3d19bd7634102efcc02be56eac85b8))
+
 ## [2.1.1](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v2.1.0...v2.1.1) (2026-05-28)
 
 
