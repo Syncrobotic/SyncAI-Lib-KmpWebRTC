@@ -1,6 +1,7 @@
 package com.syncrobotic.webrtc.signaling
 
 import com.syncrobotic.webrtc.config.IceServer
+import com.syncrobotic.webrtc.config.WebRtcLog
 import io.ktor.client.*
 import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
@@ -33,7 +34,9 @@ enum class SignalingErrorCode {
 class SignalingException(
     val code: SignalingErrorCode = SignalingErrorCode.UNKNOWN,
     message: String,
-    cause: Throwable? = null
+    cause: Throwable? = null,
+    /** HTTP status returned by the signaling server, if the failure was an HTTP response. */
+    val httpStatus: Int? = null
 ) : Exception(message, cause)
 
 /**
@@ -77,20 +80,21 @@ class HttpSignalingAdapter(
     // ── SignalingAdapter ────────────────────────────────────────────────
 
     override suspend fun sendOffer(sdpOffer: String): SignalingResult {
-        println("[HttpSignalingAdapter] sendOffer() url=$url, sdpOffer length=${sdpOffer.length}, auth=${auth::class.simpleName}")
+        println("${WebRtcLog.ts()} [HttpSignalingAdapter] sendOffer() url=$url, sdpOffer length=${sdpOffer.length}, auth=${auth::class.simpleName}")
         try {
-            println("[HttpSignalingAdapter] POSTing to $url ...")
+            println("${WebRtcLog.ts()} [HttpSignalingAdapter] POSTing to $url ...")
             val response = client.post(url) {
                 contentType(ContentType("application", "sdp"))
                 applyAuth(auth)
                 setBody(sdpOffer)
             }
-            println("[HttpSignalingAdapter] POST response status=${response.status}")
+            println("${WebRtcLog.ts()} [HttpSignalingAdapter] POST response status=${response.status}")
 
             if (response.status != HttpStatusCode.Created && response.status != HttpStatusCode.OK) {
                 throw SignalingException(
                     code = SignalingErrorCode.OFFER_REJECTED,
-                    message = "Signaling offer failed with status ${response.status.value}: ${response.bodyAsText()}"
+                    message = "Signaling offer failed with status ${response.status.value}: ${response.bodyAsText()}",
+                    httpStatus = response.status.value
                 )
             }
 
@@ -108,7 +112,7 @@ class HttpSignalingAdapter(
         } catch (e: SignalingException) {
             throw e
         } catch (e: Exception) {
-            println("[HttpSignalingAdapter] sendOffer() exception: ${e::class.simpleName}: ${e.message}")
+            println("${WebRtcLog.ts()} [HttpSignalingAdapter] sendOffer() exception: ${e::class.simpleName}: ${e.message}")
             e.printStackTrace()
             throw SignalingException(
                 code = SignalingErrorCode.NETWORK_ERROR,
