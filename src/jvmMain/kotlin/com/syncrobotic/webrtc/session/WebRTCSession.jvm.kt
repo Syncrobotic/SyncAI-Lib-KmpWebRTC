@@ -53,6 +53,7 @@ actual class WebRTCSession actual constructor(
 
     @Volatile
     private var isReconnecting = false
+    private var iceGatheringComplete: CompletableDeferred<Unit>? = null
 
     actual suspend fun connect() {
         if (closed) return
@@ -83,6 +84,7 @@ actual class WebRTCSession actual constructor(
 
     private suspend fun doConnect() {
         createdDataChannels.clear()
+        iceGatheringComplete = CompletableDeferred()
 
         // Initialize client: use initializeForSending if we need to send audio
         if (mediaConfig.requiresSending) {
@@ -93,6 +95,9 @@ actual class WebRTCSession actual constructor(
                 override fun onIceCandidate(candidate: String, sdpMid: String?, sdpMLineIndex: Int) {
                     handleIceCandidate(candidate, sdpMid, sdpMLineIndex)
                 }
+                override fun onIceGatheringComplete() {
+                    iceGatheringComplete?.complete(Unit)
+                }
             })
         } else {
             client.initialize(webrtcConfig, object : WebRTCListener {
@@ -101,6 +106,9 @@ actual class WebRTCSession actual constructor(
                 }
                 override fun onIceCandidate(candidate: String, sdpMid: String?, sdpMLineIndex: Int) {
                     handleIceCandidate(candidate, sdpMid, sdpMLineIndex)
+                }
+                override fun onIceGatheringComplete() {
+                    iceGatheringComplete?.complete(Unit)
                 }
             })
         }
@@ -135,7 +143,11 @@ actual class WebRTCSession actual constructor(
 
         // For FULL_ICE, wait for gathering then use local description with candidates
         val offerSdp = if (webrtcConfig.iceMode == IceMode.FULL_ICE) {
-            delay(webrtcConfig.iceGatheringTimeoutMs.coerceAtMost(10_000L))
+            // Wait until ICE gathering completes (timeout as a cap) instead of a flat
+            // delay — on a LAN this finishes in ~hundreds of ms, not the full timeout.
+            withTimeoutOrNull(webrtcConfig.iceGatheringTimeoutMs) {
+                iceGatheringComplete?.await()
+            }
             client.getLocalDescription() ?: localSdp
         } else {
             localSdp
