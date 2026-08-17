@@ -68,6 +68,9 @@ actual class WebRTCSession actual constructor(
     actual suspend fun connect() {
         if (closed) return
         Log.d(TAG, "connect() called, retryConfig=$retryConfig")
+        // Retrying after a failure re-enters doConnect(), which re-initializes the
+        // client. Release the half-built one first, the same way reconnect() does.
+        if (_state.value is SessionState.Error) cleanup(terminate = true)
         _state.value = SessionState.Connecting
 
         try {
@@ -85,10 +88,12 @@ actual class WebRTCSession actual constructor(
         } catch (e: Exception) {
             Log.e(TAG, "connect() failed: ${e::class.simpleName}: ${e.message}")
             if (!closed) {
+                val kind = classifySessionError(e)
                 _state.value = SessionState.Error(
                     message = e.message ?: "Connection failed",
                     cause = e,
-                    isRetryable = true
+                    isRetryable = kind.isRetryable,
+                    kind = kind
                 )
             }
         }
@@ -230,10 +235,12 @@ actual class WebRTCSession actual constructor(
         } catch (e: Exception) {
             Log.e(TAG, "reconnect() failed: ${e::class.simpleName}: ${e.message}")
             if (!closed) {
+                val kind = classifySessionError(e)
                 _state.value = SessionState.Error(
                     message = e.message ?: "Reconnection failed",
                     cause = e,
-                    isRetryable = false
+                    isRetryable = kind.isRetryable,
+                    kind = kind
                 )
             }
         } finally {

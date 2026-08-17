@@ -14,6 +14,7 @@ actual fun VideoRenderer(
     modifier: Modifier,
     onStateChange: ((PlayerState) -> Unit)?,
     onEvent: ((PlayerEvent) -> Unit)?,
+    errorContent: (@Composable (error: PlayerState.Error, retry: () -> Unit) -> Unit)?,
 ): VideoPlayerController {
     TODO("WebRTCSession VideoRenderer not yet implemented for this platform")
 }

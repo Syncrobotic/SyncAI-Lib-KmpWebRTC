@@ -290,7 +290,8 @@ fun VideoScreen() {
             when (state) {
                 is PlayerState.Playing -> println("Video playing")
                 is PlayerState.Reconnecting -> println("Reconnecting ${state.attempt}/${state.maxAttempts}")
-                is PlayerState.Error -> println("Error: ${state.message}")
+                // state.message is technical detail for logs; state.userMessage is safe for UI
+                is PlayerState.Error -> println("Error [${state.kind}]: ${state.message}")
                 else -> {}
             }
         }
@@ -520,14 +521,17 @@ App                                    Library
                                           (terminate)
 
 Cookie expired (401):
-                                       7. SessionState.Error(isRetryable = true)
+                                       7. SessionState.Error(kind = UNAUTHORIZED)
 8. App re-logins, gets new cookies
 9. App creates new adapter + session
 ```
 
 #### Cookie Expiry Handling
 
-When a signaling request receives HTTP 401, the session reports `SessionState.Error(isRetryable = true)`. Your app re-logins and creates a new session:
+When a signaling request receives HTTP 401, the session reports
+`SessionState.Error(kind = SessionErrorKind.UNAUTHORIZED, isRetryable = false)` —
+`isRetryable = false` because reconnecting with the *same* expired credentials will
+fail identically. Match on `kind` to trigger a re-login:
 
 ```kotlin
 class StreamViewModel : ViewModel() {
@@ -544,8 +548,10 @@ class StreamViewModel : ViewModel() {
             session = WebRTCSession(signaling, MediaConfig.RECEIVE_VIDEO).also { s ->
                 s.connect()
                 s.state.collect { state ->
-                    if (state is SessionState.Error && state.isRetryable) {
-                        // Possibly 401 — re-login and reconnect
+                    if (state is SessionState.Error &&
+                        state.kind == SessionErrorKind.UNAUTHORIZED
+                    ) {
+                        // 401/403 — re-login and reconnect with fresh credentials
                         session?.close()
                         authRepo.refreshSession()
                         connect()
@@ -906,7 +912,7 @@ sealed interface SignalingAuth {
      * Library attaches these as a Cookie header string — no Ktor plugin installed.
      * Suitable for standalone / CLI / test scenarios that don't share cookie storage.
      *
-     * On HTTP 401: Session reports SessionState.Error(isRetryable = true).
+     * On HTTP 401: Session reports SessionState.Error(kind = UNAUTHORIZED, isRetryable = false).
      * App should re-login and create a new adapter + session.
      *
      * @param cookies  Cookie name → value pairs obtained from your app's login
@@ -949,10 +955,46 @@ fun VideoRenderer(
     modifier: Modifier = Modifier,
     onStateChange: ((PlayerState) -> Unit)? = null,
     onEvent: ((PlayerEvent) -> Unit)? = null,
+    errorContent: (@Composable (error: PlayerState.Error, retry: () -> Unit) -> Unit)? = null,
 ): VideoPlayerController
 ```
 
 Built-in connection status overlay — automatically displays connecting/reconnecting/error states.
+
+**Overlay behavior:**
+
+- Raw exception text is **never** rendered. The overlay shows `PlayerState.Error.userMessage`
+  / `userHint`, derived from [`SessionErrorKind`](#sessionerrorkind).
+- A brief reconnect keeps the last frame visible for ~1.5s before the status card
+  appears, so a momentary network hiccup doesn't flash an error at the viewer.
+- A **Retry** button is offered only when `error.isRetryable` — an expired token or a
+  malformed offer would fail identically, so no button is shown there.
+
+**Custom error UI** — pass `errorContent` for localized copy, app typography, or a
+re-authentication flow:
+
+```kotlin
+VideoRenderer(
+    session = session,
+    errorContent = { error, retry ->
+        when (error.kind) {
+            SessionErrorKind.UNAUTHORIZED -> ReAuthPrompt(onSignedIn = retry)
+            else -> MyErrorCard(
+                title = stringResource(error.kind.titleRes()),
+                onRetry = retry.takeIf { error.isRetryable }
+            )
+        }
+    }
+)
+```
+
+**Technical details on screen** — off by default; the raw exception is developer
+diagnostics, not UI copy. Enable for on-device triage in debug builds:
+
+```kotlin
+WebRtcUiOptions.showTechnicalDetails = BuildConfig.DEBUG
+WebRtcUiOptions.technicalDetailLimit = 240   // character cap, default 240
+```
 
 #### CameraPreview — Display Local Camera
 
@@ -1206,15 +1248,59 @@ sealed class SessionState {
 
     /** Connection error. Check isRetryable for recovery possibility. */
     data class Error(
+        /** Technical detail for logs — NOT UI copy. May contain server text. */
         val message: String,
         val cause: Throwable? = null,
-        val isRetryable: Boolean = true
-    ) : SessionState()
+        /** Whether reconnecting has a realistic chance of succeeding. */
+        val isRetryable: Boolean = true,
+        /** Semantic category — switch on this for user-facing / localized copy. */
+        val kind: SessionErrorKind = SessionErrorKind.UNKNOWN
+    ) : SessionState() {
+        /** Short user-facing headline, safe to display. */
+        val userMessage: String
+        /** One-line user-facing hint, safe to display. */
+        val userHint: String
+    }
 
     /** Session closed. Terminal state — create a new session to reconnect. */
     data object Closed : SessionState()
 }
 ```
+
+#### SessionErrorKind
+
+Semantic category of a connection failure. **This — not `Error.message` — is what you
+render.** `message` carries raw exception text (potentially an entire HTTP response body
+or internal server path) and belongs in logs only.
+
+| Kind | Cause | `isRetryable` |
+|------|-------|---------------|
+| `NETWORK` | Host unreachable, DNS/TLS failure, socket closed; signaling with no HTTP response | ✅ |
+| `TIMEOUT` | Request sent, nothing came back in time; HTTP 408 | ✅ |
+| `UNAUTHORIZED` | HTTP 401 / 403 | ❌ |
+| `STREAM_UNAVAILABLE` | HTTP 404 / 410 — device likely offline or not publishing | ✅ |
+| `REJECTED` | Other 4xx — e.g. 400 bad offer, 406 unsupported media | ❌ |
+| `SERVER_ERROR` | 5xx, plus 425 / 429 rate limits | ✅ |
+| `CONFIGURATION` | Caller mistake — missing Android `Context`, bad media config | ❌ |
+| `UNKNOWN` | Unclassified | ✅ |
+
+`isRetryable` means "reconnecting with the same inputs has a realistic chance of
+succeeding". It drives whether the built-in overlay offers a Retry button.
+
+Each kind exposes `userMessage` and `userHint` — short English strings safe to display.
+For other languages, switch on the kind and supply your own:
+
+```kotlin
+val title = when (error.kind) {
+    SessionErrorKind.STREAM_UNAVAILABLE -> stringResource(R.string.device_offline)
+    SessionErrorKind.UNAUTHORIZED       -> stringResource(R.string.session_expired)
+    else                                -> stringResource(R.string.stream_error)
+}
+```
+
+Classification walks the `cause` chain, so the wrapping
+`StreamRetryExhaustedException` → `SignalingException` → platform socket exception
+nesting produced by the retry handler still resolves to the underlying cause.
 
 #### PlayerState
 
@@ -1229,7 +1315,7 @@ Video rendering state, reported by `VideoRenderer` via `onStateChange`.
 | `Paused` | Playback paused |
 | `Buffering(percent)` | Temporary interruption |
 | `Reconnecting(attempt, maxAttempts, reason, nextRetryMs)` | Auto-reconnecting |
-| `Error(message, cause)` | Error occurred |
+| `Error(message, cause, kind, isRetryable)` | Error occurred — show `userMessage` / `userHint`, not `message` |
 | `Stopped` | Playback stopped |
 
 #### AudioPushState
@@ -1309,7 +1395,7 @@ fun CameraView(streamUrl: String) {
             is SessionState.Connected -> "Live"
             is SessionState.Connecting -> "Connecting..."
             is SessionState.Reconnecting -> "Reconnecting..."
-            is SessionState.Error -> "Error: ${(sessionState as SessionState.Error).message}"
+            is SessionState.Error -> (sessionState as SessionState.Error).userMessage
             else -> "Idle"
         })
     }
@@ -1459,7 +1545,7 @@ class AudioStreamingService : Service() {
                 when (state) {
                     is SessionState.Connected -> updateNotification("Streaming audio")
                     is SessionState.Reconnecting -> updateNotification("Reconnecting...")
-                    is SessionState.Error -> updateNotification("Error: ${state.message}")
+                    is SessionState.Error -> updateNotification(state.userMessage)
                     else -> {}
                 }
             }

@@ -1,5 +1,7 @@
 package com.syncrobotic.webrtc.ui
 
+import com.syncrobotic.webrtc.session.SessionErrorKind
+
 /**
  * Represents the current state of a video player.
  */
@@ -25,8 +27,27 @@ sealed interface PlayerState {
     /** Player has stopped (end of stream or manually stopped) */
     data object Stopped : PlayerState
     
-    /** Player encountered an error */
-    data class Error(val message: String, val cause: Throwable? = null) : PlayerState
+    /**
+     * Player encountered an error.
+     *
+     * @param message Technical detail for logs. **Not UI copy** — show [userMessage]
+     *   / [userHint], or switch on [kind] to supply your own localized strings.
+     * @param cause Underlying throwable, if any
+     * @param kind Semantic category used to derive user-facing copy
+     * @param isRetryable Whether reconnecting has a realistic chance of succeeding
+     */
+    data class Error(
+        val message: String,
+        val cause: Throwable? = null,
+        val kind: SessionErrorKind = SessionErrorKind.UNKNOWN,
+        val isRetryable: Boolean = kind.isRetryable
+    ) : PlayerState {
+        /** Short user-facing headline, safe to display. Derived from [kind]. */
+        val userMessage: String get() = kind.userMessage
+
+        /** One-line user-facing hint, safe to display. Derived from [kind]. */
+        val userHint: String get() = kind.userHint
+    }
     
     /**
      * Player is attempting to reconnect after a failure or disconnection.

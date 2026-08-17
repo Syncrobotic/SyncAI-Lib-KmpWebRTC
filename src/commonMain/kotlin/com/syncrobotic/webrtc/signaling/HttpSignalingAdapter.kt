@@ -91,9 +91,12 @@ class HttpSignalingAdapter(
             println("${WebRtcLog.ts()} [HttpSignalingAdapter] POST response status=${response.status}")
 
             if (response.status != HttpStatusCode.Created && response.status != HttpStatusCode.OK) {
+                // The body goes to the log only. It is frequently an HTML error page or a
+                // server stack trace, and this message ends up in SessionState.Error.
+                println("${WebRtcLog.ts()} [HttpSignalingAdapter] POST rejected, body=${response.bodyAsText().truncateForLog()}")
                 throw SignalingException(
                     code = SignalingErrorCode.OFFER_REJECTED,
-                    message = "Signaling offer failed with status ${response.status.value}: ${response.bodyAsText()}",
+                    message = "Signaling offer rejected with HTTP ${response.status.value}",
                     httpStatus = response.status.value
                 )
             }
@@ -142,9 +145,11 @@ class HttpSignalingAdapter(
             if (response.status != HttpStatusCode.NoContent &&
                 response.status != HttpStatusCode.OK
             ) {
+                println("${WebRtcLog.ts()} [HttpSignalingAdapter] PATCH rejected, body=${response.bodyAsText().truncateForLog()}")
                 throw SignalingException(
                     code = SignalingErrorCode.ICE_CANDIDATE_FAILED,
-                    message = "Failed to send ICE candidate: ${response.status.value}: ${response.bodyAsText()}"
+                    message = "Failed to send ICE candidate: HTTP ${response.status.value}",
+                    httpStatus = response.status.value
                 )
             }
         } catch (e: SignalingException) {
@@ -257,6 +262,18 @@ internal fun createDefaultClient(auth: SignalingAuth): HttpClient {
 internal expect fun createPlatformHttpClient(
     block: io.ktor.client.HttpClientConfig<*>.() -> Unit = {}
 ): HttpClient
+
+/** Cap on error-response bodies written to the log. */
+private const val LOG_BODY_LIMIT = 512
+
+/**
+ * Trim an error response body for logging.
+ *
+ * Error bodies are often full HTML pages or server stack traces; they belong in
+ * the log, bounded, and never in an exception message that reaches the UI.
+ */
+internal fun String.truncateForLog(): String =
+    if (length <= LOG_BODY_LIMIT) this else take(LOG_BODY_LIMIT) + "…(${length} chars)"
 
 /**
  * Wrap an existing [HttpClient] to install [HttpCookies] if needed.

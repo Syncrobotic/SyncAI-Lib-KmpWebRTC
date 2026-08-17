@@ -6,7 +6,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -92,27 +91,17 @@ actual fun CameraPreview(
                     dstSize = IntSize(size.width.toInt(), size.height.toInt())
                 )
             }
-        } else {
-            // Placeholder
+        } else if (sessionState is SessionState.Idle || sessionState is SessionState.Closed) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                when (sessionState) {
-                    is SessionState.Connecting, is SessionState.Reconnecting -> {
-                        CircularProgressIndicator(color = Color.White)
-                    }
-                    is SessionState.Error -> {
-                        Text(
-                            text = (sessionState as SessionState.Error).message,
-                            color = Color.Red
-                        )
-                    }
-                    else -> {
-                        Text(text = "Camera Off", color = Color.Gray)
-                    }
-                }
+                Text(text = "Camera Off", color = Color.Gray)
             }
+        } else {
+            // Shared placeholder: same connecting/error treatment as VideoRenderer,
+            // instead of a second copy that printed raw exception text in red.
+            SessionVideoPlaceholder(sessionState, Modifier)
         }
     }
 

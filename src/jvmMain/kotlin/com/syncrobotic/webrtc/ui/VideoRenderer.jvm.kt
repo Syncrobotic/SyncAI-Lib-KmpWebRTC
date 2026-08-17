@@ -26,6 +26,7 @@ actual fun VideoRenderer(
     modifier: Modifier,
     onStateChange: ((PlayerState) -> Unit)?,
     onEvent: ((PlayerEvent) -> Unit)?,
+    errorContent: (@Composable (error: PlayerState.Error, retry: () -> Unit) -> Unit)?,
 ): VideoPlayerController {
     var currentFrame by remember { mutableStateOf<ImageBitmap?>(null) }
     val sessionState by session.state.collectAsState()
@@ -33,6 +34,8 @@ actual fun VideoRenderer(
     var hasReportedFirstFrame by remember { mutableStateOf(false) }
     var lastReportedWidth by remember { mutableStateOf(0) }
     var lastReportedHeight by remember { mutableStateOf(0) }
+    // Bumped by the retry affordance to re-run the connect effect.
+    var retryTick by remember { mutableStateOf(0) }
 
     val frameFlow = remember { MutableSharedFlow<ImageBitmap>(replay = 1) }
 
@@ -40,7 +43,7 @@ actual fun VideoRenderer(
         frameFlow.collect { bitmap -> currentFrame = bitmap }
     }
 
-    LaunchedEffect(session) {
+    LaunchedEffect(session, retryTick) {
         session.onClientReady = { client ->
             hasReportedFirstFrame = false
             currentFrame = null
@@ -87,10 +90,13 @@ actual fun VideoRenderer(
                     dstSize = IntSize(size.width.toInt(), size.height.toInt())
                 )
             }
-            SessionStatusOverlay(sessionState)
-        } else {
-            SessionVideoPlaceholder(sessionState, Modifier)
         }
+        SessionStatusLayer(
+            sessionState = sessionState,
+            hasVideoFrame = frame != null,
+            onRetry = { retryTick++ },
+            errorContent = errorContent
+        )
     }
 
     DisposableEffect(session) {
