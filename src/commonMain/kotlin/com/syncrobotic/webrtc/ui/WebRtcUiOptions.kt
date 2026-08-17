@@ -20,4 +20,20 @@ object WebRtcUiOptions {
 
     /** Character cap applied to technical detail text so it can't flood the frame. */
     var technicalDetailLimit: Int = 240
+
+    /**
+     * Reconnect attempts after which the overlay explains *why* it is still spinning.
+     *
+     * With [com.syncrobotic.webrtc.config.RetryConfig.PERSISTENT] the session retries
+     * without bound and therefore never reaches [com.syncrobotic.webrtc.session.SessionState.Error],
+     * so an offline device would otherwise show a bare spinner indefinitely with no
+     * explanation. Past this threshold the overlay adds a reason line — retries continue
+     * either way.
+     *
+     * Whichever of this and [reconnectHintAfterMs] is reached first wins.
+     */
+    var reconnectHintAfterAttempts: Int = 3
+
+    /** Time spent reconnecting after which the overlay explains why. See [reconnectHintAfterAttempts]. */
+    var reconnectHintAfterMs: Long = 15_000L
 }

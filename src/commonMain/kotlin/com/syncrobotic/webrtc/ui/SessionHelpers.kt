@@ -117,8 +117,8 @@ internal fun SessionVideoPlaceholder(
     ) {
         // No frame to protect here, so no grace period — show progress immediately.
         when (sessionState) {
-            is SessionState.Connecting -> ProgressContent(reconnecting = false)
-            is SessionState.Reconnecting -> ProgressContent(reconnecting = true)
+            is SessionState.Connecting -> ConnectingContent()
+            is SessionState.Reconnecting -> ReconnectingContent(sessionState)
             is SessionState.Error -> ErrorContent(sessionState, onRetry)
             else -> {}
         }
@@ -171,8 +171,8 @@ internal fun SessionStatusOverlay(
                 .padding(horizontal = 24.dp, vertical = 20.dp)
         ) {
             when (sessionState) {
-                is SessionState.Connecting -> ProgressContent(reconnecting = false)
-                is SessionState.Reconnecting -> ProgressContent(reconnecting = true)
+                is SessionState.Connecting -> ConnectingContent()
+                is SessionState.Reconnecting -> ReconnectingContent(sessionState)
                 is SessionState.Error -> ErrorContent(sessionState, onRetry)
                 else -> {}
             }
@@ -214,26 +214,81 @@ private fun SessionState.toStatusKind(): OverlayStatus = when (this) {
 }
 
 @Composable
-private fun ProgressContent(reconnecting: Boolean) {
+private fun ConnectingContent() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         CircularProgressIndicator(
-            color = if (reconnecting) ReconnectAccent else PrimaryText,
+            color = PrimaryText,
             strokeWidth = 2.dp,
             modifier = Modifier.size(28.dp)
         )
         Spacer(Modifier.height(10.dp))
-        // The attempt counter is intentionally omitted: with RetryConfig.PERSISTENT it
-        // climbs without bound, and a rising number reads as "getting worse".
-        // Callers that want it can read SessionState.Reconnecting via onStateChange.
         Text(
-            text = if (reconnecting) "Reconnecting…" else "Connecting…",
+            text = "Connecting…",
             color = PrimaryText,
             fontSize = 14.sp,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+/**
+ * Whether a reconnect has gone on long enough to deserve an explanation.
+ *
+ * Extracted from the composable so the thresholds are unit-testable.
+ */
+internal fun isProlongedReconnect(attempt: Int, timeThresholdReached: Boolean): Boolean =
+    timeThresholdReached || attempt >= WebRtcUiOptions.reconnectHintAfterAttempts
+
+@Composable
+private fun ReconnectingContent(state: SessionState.Reconnecting) {
+    // Starts when the session begins reconnecting (this content entering composition)
+    // and resets if it recovers and drops out again.
+    var timeThresholdReached by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(WebRtcUiOptions.reconnectHintAfterMs)
+        timeThresholdReached = true
+    }
+    val prolonged = isProlongedReconnect(state.attempt, timeThresholdReached)
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        CircularProgressIndicator(
+            color = ReconnectAccent,
+            strokeWidth = 2.dp,
+            modifier = Modifier.size(28.dp)
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = if (prolonged) "Still reconnecting…" else "Reconnecting…",
+            color = PrimaryText,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center
+        )
+        // Under RetryConfig.PERSISTENT the session retries without bound and never
+        // reaches Error, so without this the user would watch a bare spinner forever
+        // with no idea why. The attempt count is withheld until now on purpose: early
+        // on it only churns, but once we're explaining a stall it is real information.
+        if (prolonged) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "The device may be offline. Retrying automatically.",
+                color = SecondaryText,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Attempt ${state.attempt}",
+                color = TertiaryText,
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 

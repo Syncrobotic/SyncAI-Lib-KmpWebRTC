@@ -969,6 +969,16 @@ Built-in connection status overlay — automatically displays connecting/reconne
   appears, so a momentary network hiccup doesn't flash an error at the viewer.
 - A **Retry** button is offered only when `error.isRetryable` — an expired token or a
   malformed offer would fail identically, so no button is shown there.
+- A **prolonged reconnect explains itself.** Under `RetryConfig.PERSISTENT` the session
+  retries without bound and so never reaches `SessionState.Error` — an offline device
+  would otherwise show a bare spinner forever. After 3 attempts or 15s (whichever comes
+  first) the overlay adds "The device may be offline. Retrying automatically." plus the
+  attempt count. Retries continue regardless; this is information, not a state change.
+
+```kotlin
+WebRtcUiOptions.reconnectHintAfterAttempts = 3        // default
+WebRtcUiOptions.reconnectHintAfterMs = 15_000L        // default
+```
 
 **Custom error UI** — pass `errorContent` for localized copy, app typography, or a
 re-authentication flow:
