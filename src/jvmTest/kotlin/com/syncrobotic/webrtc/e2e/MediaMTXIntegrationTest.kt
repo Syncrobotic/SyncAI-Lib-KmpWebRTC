@@ -17,7 +17,11 @@ import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 import kotlin.test.*
+
+/** Bound on the `docker info` availability probe — see [MediaMTXIntegrationTest.isDockerAvailable]. */
+private const val DOCKER_PROBE_TIMEOUT_SECONDS = 5L
 
 /**
  * Level 2: Integration tests using Testcontainers + real MediaMTX.
@@ -257,12 +261,23 @@ class MediaMTXIntegrationTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
+    /**
+     * A hung Docker daemon accepts the socket but never answers, so `docker info`
+     * blocks forever. Without a bounded wait this probe — whose whole job is to let
+     * the test skip — becomes the thing that hangs the entire jvmTest run, and with
+     * it the pre-push hook. Treat "no answer in time" as "not available".
+     */
     private fun isDockerAvailable(): Boolean {
         return try {
             val process = ProcessBuilder("docker", "info")
                 .redirectErrorStream(true)
                 .start()
-            process.waitFor() == 0
+            if (!process.waitFor(DOCKER_PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                false
+            } else {
+                process.exitValue() == 0
+            }
         } catch (_: Exception) {
             false
         }
