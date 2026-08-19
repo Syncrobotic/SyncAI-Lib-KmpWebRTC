@@ -25,14 +25,17 @@ actual fun VideoRenderer(
     modifier: Modifier,
     onStateChange: ((PlayerState) -> Unit)?,
     onEvent: ((PlayerEvent) -> Unit)?,
+    errorContent: (@Composable (error: PlayerState.Error, retry: () -> Unit) -> Unit)?,
 ): VideoPlayerController {
     var videoView by remember { mutableStateOf<RTCMTLVideoView?>(null) }
     val sessionState by session.state.collectAsState()
     val connectionStartTime = remember { (NSDate().timeIntervalSince1970 * 1000).toLong() }
     var hasReportedFirstFrame by remember { mutableStateOf(false) }
+    // Bumped by the retry affordance to re-run the connect effect.
+    var retryTick by remember { mutableStateOf(0) }
 
     // Set up video rendering callback and auto-connect
-    LaunchedEffect(session) {
+    LaunchedEffect(session, retryTick) {
         session.onClientReady = { client ->
             // Reset state for new connection (reconnect scenario)
             hasReportedFirstFrame = false
@@ -63,10 +66,13 @@ actual fun VideoRenderer(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            SessionStatusOverlay(sessionState)
-        } else {
-            SessionVideoPlaceholder(sessionState, Modifier)
         }
+        SessionStatusLayer(
+            sessionState = sessionState,
+            hasVideoFrame = view != null,
+            onRetry = { retryTick++ },
+            errorContent = errorContent
+        )
     }
 
     // Cleanup

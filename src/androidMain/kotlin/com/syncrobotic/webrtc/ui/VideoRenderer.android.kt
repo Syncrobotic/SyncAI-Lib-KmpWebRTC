@@ -24,15 +24,18 @@ actual fun VideoRenderer(
     modifier: Modifier,
     onStateChange: ((PlayerState) -> Unit)?,
     onEvent: ((PlayerEvent) -> Unit)?,
+    errorContent: (@Composable (error: PlayerState.Error, retry: () -> Unit) -> Unit)?,
 ): VideoPlayerController {
     val context = LocalContext.current
     var surfaceViewRenderer by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
     val sessionState by session.state.collectAsState()
     val connectionStartTime = remember { System.currentTimeMillis() }
     var hasReportedFirstFrame by remember { mutableStateOf(false) }
+    // Bumped by the retry affordance to re-run the connect effect.
+    var retryTick by remember { mutableStateOf(0) }
 
     // Set up video rendering callback and auto-connect
-    LaunchedEffect(session) {
+    LaunchedEffect(session, retryTick) {
         session.onClientReady = { client, ctx ->
             surfaceViewRenderer = client.createSurfaceViewRenderer(ctx)
         }
@@ -70,10 +73,13 @@ actual fun VideoRenderer(
                     modifier = Modifier.fillMaxSize()
                 )
             }
-            SessionStatusOverlay(sessionState)
-        } else {
-            SessionVideoPlaceholder(sessionState, Modifier)
         }
+        SessionStatusLayer(
+            sessionState = sessionState,
+            hasVideoFrame = renderer != null,
+            onRetry = { retryTick++ },
+            errorContent = errorContent
+        )
     }
 
     // Cleanup callback on dispose
