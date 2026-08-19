@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.2.0](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v2.1.2...v2.2.0) (2026-08-19)
+
+
+### Features
+
+* add retryNow() and offer retry during a stalled reconnect ([61bd598](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/61bd598382c5ae0880cdfc003dc25b4997611486))
+* add retryNow() and offer retry during a stalled reconnect ([240f712](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/240f7126ee6e9ddd4680f26847705c2d963dc7c5))
+* explain prolonged reconnects instead of spinning silently ([867819d](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/867819de76a2d20b5a30bb6ac075016853815dee))
+* replace raw exception overlay with user-facing video error UI ([cb03c4d](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/cb03c4d3133fb21ef9e2798187fc0b6787040451))
+* replace raw exception overlay with user-facing video error UI ([5b76108](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/commit/5b76108ae96b47092284d03c18f5ab7586d178ce))
+
 ## [2.1.2](https://github.com/Syncrobotic/SyncAI-Lib-KmpWebRTC/compare/v2.1.1...v2.1.2) (2026-08-07)
 
 
