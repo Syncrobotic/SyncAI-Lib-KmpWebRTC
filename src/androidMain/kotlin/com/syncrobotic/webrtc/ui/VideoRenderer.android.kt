@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.syncrobotic.webrtc.session.SessionState
 import com.syncrobotic.webrtc.session.WebRTCSession
+import kotlinx.coroutines.launch
 import org.webrtc.SurfaceViewRenderer
 
 /**
@@ -29,13 +30,14 @@ actual fun VideoRenderer(
     val context = LocalContext.current
     var surfaceViewRenderer by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
     val sessionState by session.state.collectAsState()
+    // Retry runs outside the connect effect: session.retryNow() interrupts the
+    // in-flight attempt itself, so no effect restart is involved.
+    val uiScope = rememberCoroutineScope()
     val connectionStartTime = remember { System.currentTimeMillis() }
     var hasReportedFirstFrame by remember { mutableStateOf(false) }
-    // Bumped by the retry affordance to re-run the connect effect.
-    var retryTick by remember { mutableStateOf(0) }
 
     // Set up video rendering callback and auto-connect
-    LaunchedEffect(session, retryTick) {
+    LaunchedEffect(session) {
         session.onClientReady = { client, ctx ->
             surfaceViewRenderer = client.createSurfaceViewRenderer(ctx)
         }
@@ -77,7 +79,7 @@ actual fun VideoRenderer(
         SessionStatusLayer(
             sessionState = sessionState,
             hasVideoFrame = renderer != null,
-            onRetry = { retryTick++ },
+            onRetry = { uiScope.launch { session.retryNow() } },
             errorContent = errorContent
         )
     }

@@ -35,6 +35,10 @@ actual class WebRTCSession actual constructor(
         TODO("WebRTCSession not yet implemented for JS platform")
     }
 
+    actual suspend fun retryNow() {
+        TODO("WebRTCSession not yet implemented for JS platform")
+    }
+
     actual fun createDataChannel(config: DataChannelConfig): DataChannel? = null
     actual fun setAudioEnabled(enabled: Boolean) {}
     actual fun setRemoteVideoEnabled(enabled: Boolean) {}

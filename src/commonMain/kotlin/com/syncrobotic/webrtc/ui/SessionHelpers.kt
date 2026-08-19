@@ -118,7 +118,7 @@ internal fun SessionVideoPlaceholder(
         // No frame to protect here, so no grace period — show progress immediately.
         when (sessionState) {
             is SessionState.Connecting -> ConnectingContent()
-            is SessionState.Reconnecting -> ReconnectingContent(sessionState)
+            is SessionState.Reconnecting -> ReconnectingContent(sessionState, onRetry)
             is SessionState.Error -> ErrorContent(sessionState, onRetry)
             else -> {}
         }
@@ -172,7 +172,7 @@ internal fun SessionStatusOverlay(
         ) {
             when (sessionState) {
                 is SessionState.Connecting -> ConnectingContent()
-                is SessionState.Reconnecting -> ReconnectingContent(sessionState)
+                is SessionState.Reconnecting -> ReconnectingContent(sessionState, onRetry)
                 is SessionState.Error -> ErrorContent(sessionState, onRetry)
                 else -> {}
             }
@@ -242,8 +242,26 @@ private fun ConnectingContent() {
 internal fun isProlongedReconnect(attempt: Int, timeThresholdReached: Boolean): Boolean =
     timeThresholdReached || attempt >= WebRtcUiOptions.reconnectHintAfterAttempts
 
+/**
+ * Whether the overlay should offer a retry affordance for [state].
+ *
+ * - [SessionState.Error]: only when retrying could plausibly succeed. An expired token
+ *   or a malformed offer fails identically every time, so a button there is a lie.
+ * - [SessionState.Reconnecting]: only once the reconnect is prolonged. Early on the
+ *   session is already retrying quickly and a button would just add noise; once stalled,
+ *   it lets the user skip the backoff (up to 45s under RetryConfig.PERSISTENT).
+ *
+ * Extracted from the composables so the matrix is unit-testable.
+ */
+internal fun shouldOfferRetry(state: SessionState, prolongedReconnect: Boolean): Boolean =
+    when (state) {
+        is SessionState.Error -> state.isRetryable
+        is SessionState.Reconnecting -> prolongedReconnect
+        else -> false
+    }
+
 @Composable
-private fun ReconnectingContent(state: SessionState.Reconnecting) {
+private fun ReconnectingContent(state: SessionState.Reconnecting, onRetry: (() -> Unit)?) {
     // Starts when the session begins reconnecting (this content entering composition)
     // and resets if it recovers and drops out again.
     var timeThresholdReached by remember { mutableStateOf(false) }
@@ -288,6 +306,12 @@ private fun ReconnectingContent(state: SessionState.Reconnecting) {
                 fontSize = 10.sp,
                 textAlign = TextAlign.Center
             )
+            // Works mid-reconnect: session.retryNow() interrupts the in-flight attempt
+            // rather than waiting out the backoff.
+            if (onRetry != null && shouldOfferRetry(state, prolongedReconnect = true)) {
+                Spacer(Modifier.height(16.dp))
+                RetryButton(onRetry, label = "Retry now")
+            }
         }
     }
 }
@@ -333,15 +357,15 @@ private fun ErrorContent(error: SessionState.Error, onRetry: (() -> Unit)?) {
                 textAlign = TextAlign.Center
             )
         }
-        if (onRetry != null && error.isRetryable) {
+        if (onRetry != null && shouldOfferRetry(error, prolongedReconnect = false)) {
             Spacer(Modifier.height(16.dp))
-            RetryButton(onRetry)
+            RetryButton(onRetry, label = "Retry")
         }
     }
 }
 
 @Composable
-private fun RetryButton(onRetry: () -> Unit) {
+private fun RetryButton(onRetry: () -> Unit, label: String) {
     Box(
         modifier = Modifier
             .clip(ButtonShape)
@@ -351,7 +375,7 @@ private fun RetryButton(onRetry: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Retry",
+            text = label,
             color = PrimaryText,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium
