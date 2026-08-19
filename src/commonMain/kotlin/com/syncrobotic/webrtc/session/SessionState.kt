@@ -30,12 +30,28 @@ sealed class SessionState {
         val maxAttempts: Int?
     ) : SessionState()
 
-    /** Connection error. Check [isRetryable] for recovery possibility. */
+    /**
+     * Connection error. Check [isRetryable] for recovery possibility.
+     *
+     * @param message Technical detail for logs and crash reports. **Not UI copy** —
+     *   it may carry an HTTP response body or internal server text. Render
+     *   [userMessage] / [userHint] instead, or switch on [kind] for localized copy.
+     * @param cause Underlying throwable, if any
+     * @param isRetryable Whether reconnecting has a realistic chance of succeeding
+     * @param kind Semantic category used to derive user-facing copy
+     */
     data class Error(
         val message: String,
         val cause: Throwable? = null,
-        val isRetryable: Boolean = true
-    ) : SessionState()
+        val isRetryable: Boolean = true,
+        val kind: SessionErrorKind = SessionErrorKind.UNKNOWN
+    ) : SessionState() {
+        /** Short user-facing headline, safe to display. Derived from [kind]. */
+        val userMessage: String get() = kind.userMessage
+
+        /** One-line user-facing hint, safe to display. Derived from [kind]. */
+        val userHint: String get() = kind.userHint
+    }
 
     /** Session closed. Terminal state — create a new session to reconnect. */
     data object Closed : SessionState()

@@ -11,6 +11,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * JVM/Desktop implementation of [WebRTCSession].
@@ -51,32 +53,75 @@ actual class WebRTCSession actual constructor(
     @Volatile
     private var closed = false
 
-    @Volatile
-    private var isReconnecting = false
+    /** Serialises attempt start/stop so two attempts never touch the client at once. */
+    private val attemptMutex = Mutex()
+
+    /** The single in-flight connect/reconnect attempt, owned by this session. */
+    private var attemptJob: Job? = null
     private var iceGatheringComplete: CompletableDeferred<Unit>? = null
 
     actual suspend fun connect() {
         if (closed) return
-        _state.value = SessionState.Connecting
+        runAttempt("connect")
+    }
 
+    actual suspend fun retryNow() {
+        if (closed) return
+        runAttempt("retryNow")
+    }
+
+    /**
+     * Run a connect attempt as the session's single owned attempt.
+     *
+     * Cancels **and joins** any previous attempt before touching the client, so a
+     * "retry now" arriving mid-reconnect can never race the attempt it replaces.
+     *
+     * The attempt runs via [withContext] on a session-owned [Job] rather than being
+     * launched on [scope], so it keeps the caller's dispatcher — retry backoff then
+     * still uses the caller's scheduler, which matters for `runTest` virtual time.
+     */
+    private suspend fun runAttempt(actionName: String) {
+        val gate = attemptMutex.withLock {
+            attemptJob?.cancelAndJoin()
+            _state.value = SessionState.Connecting
+            Job().also { attemptJob = it }
+        }
+        try {
+            withContext(gate) { attemptLoop(actionName) }
+        } catch (e: CancellationException) {
+            // Distinguish "a newer attempt superseded us" from "our caller was
+            // cancelled". Only the latter should propagate.
+            if (currentCoroutineContext().isActive) return else throw e
+        } finally {
+            gate.complete()
+        }
+    }
+
+    private suspend fun attemptLoop(actionName: String) {
         try {
             StreamRetryHandler.withRetry(
                 config = retryConfig,
-                actionName = "WebRTCSession connect",
+                actionName = "WebRTCSession $actionName",
                 onAttempt = { attempt, maxAttempts, _ ->
                     _state.value = SessionState.Reconnecting(attempt, maxAttempts)
                 }
             ) {
+                // Every attempt starts from a clean client: doConnect() re-initialises it,
+                // and re-initialising over a half-built one is what stuck sessions before.
+                // All calls are null-safe, so this is a no-op on a fresh session.
+                cleanup(terminate = true)
                 doConnect()
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             if (!closed) {
+                val kind = classifySessionError(e)
                 _state.value = SessionState.Error(
                     message = e.message ?: "Connection failed",
                     cause = e,
-                    isRetryable = true
+                    isRetryable = kind.isRetryable,
+                    kind = kind
                 )
             }
         }
@@ -174,7 +219,7 @@ actual class WebRTCSession actual constructor(
                 startStatsCollection()
             }
             WebRTCState.DISCONNECTED, WebRTCState.FAILED -> {
-                if (!closed && !isReconnecting) {
+                if (!closed && attemptJob?.isActive != true) {
                     scope.launch { reconnect() }
                 }
             }
@@ -195,32 +240,8 @@ actual class WebRTCSession actual constructor(
     }
 
     private suspend fun reconnect() {
-        if (closed || isReconnecting) return
-        isReconnecting = true
-        try {
-            StreamRetryHandler.withRetry(
-                config = retryConfig,
-                actionName = "WebRTCSession reconnect",
-                onAttempt = { attempt, maxAttempts, _ ->
-                    _state.value = SessionState.Reconnecting(attempt, maxAttempts)
-                }
-            ) {
-                cleanup(terminate = true)
-                doConnect()
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            if (!closed) {
-                _state.value = SessionState.Error(
-                    message = e.message ?: "Reconnection failed",
-                    cause = e,
-                    isRetryable = false
-                )
-            }
-        } finally {
-            isReconnecting = false
-        }
+        if (closed) return
+        runAttempt("reconnect")
     }
 
     actual fun createDataChannel(config: DataChannelConfig): DataChannel? {

@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.syncrobotic.webrtc.session.SessionState
 import com.syncrobotic.webrtc.session.WebRTCSession
+import kotlinx.coroutines.launch
 import dev.onvoid.webrtc.media.video.VideoFrame as NativeVideoFrame
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.jetbrains.skia.Bitmap
@@ -26,9 +27,13 @@ actual fun VideoRenderer(
     modifier: Modifier,
     onStateChange: ((PlayerState) -> Unit)?,
     onEvent: ((PlayerEvent) -> Unit)?,
+    errorContent: (@Composable (error: PlayerState.Error, retry: () -> Unit) -> Unit)?,
 ): VideoPlayerController {
     var currentFrame by remember { mutableStateOf<ImageBitmap?>(null) }
     val sessionState by session.state.collectAsState()
+    // Retry runs outside the connect effect: session.retryNow() interrupts the
+    // in-flight attempt itself, so no effect restart is involved.
+    val uiScope = rememberCoroutineScope()
     val connectionStartTime = remember { System.currentTimeMillis() }
     var hasReportedFirstFrame by remember { mutableStateOf(false) }
     var lastReportedWidth by remember { mutableStateOf(0) }
@@ -87,10 +92,13 @@ actual fun VideoRenderer(
                     dstSize = IntSize(size.width.toInt(), size.height.toInt())
                 )
             }
-            SessionStatusOverlay(sessionState)
-        } else {
-            SessionVideoPlaceholder(sessionState, Modifier)
         }
+        SessionStatusLayer(
+            sessionState = sessionState,
+            hasVideoFrame = frame != null,
+            onRetry = { uiScope.launch { session.retryNow() } },
+            errorContent = errorContent
+        )
     }
 
     DisposableEffect(session) {

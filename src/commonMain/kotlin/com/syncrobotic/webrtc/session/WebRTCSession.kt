@@ -76,6 +76,24 @@ expect class WebRTCSession(
     suspend fun connect()
 
     /**
+     * Interrupt whatever connection attempt is in flight and start a fresh one immediately.
+     *
+     * Unlike calling [connect] again, this works from *any* non-closed state — including
+     * while the session is mid-[SessionState.Reconnecting]. It cancels the running attempt,
+     * waits for it to finish unwinding, tears the client down, then reconnects. Two attempts
+     * therefore never touch the underlying client concurrently.
+     *
+     * The main use is a user-facing "retry now" affordance: under
+     * [com.syncrobotic.webrtc.config.RetryConfig.PERSISTENT] the backoff grows to 45s
+     * between attempts, and this skips the wait.
+     *
+     * Suspends until the new attempt settles (connected, or failed into
+     * [SessionState.Error]). Safe to call repeatedly — concurrent calls are serialised and
+     * only the last one's attempt survives.
+     */
+    suspend fun retryNow()
+
+    /**
      * Create a DataChannel on this connection.
      *
      * For best results, call before [connect] so the channel is included in the initial

@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
 import com.syncrobotic.webrtc.session.SessionState
 import com.syncrobotic.webrtc.session.WebRTCSession
+import kotlinx.coroutines.launch
 import cocoapods.GoogleWebRTC.RTCMTLVideoView
 import kotlinx.cinterop.*
 import platform.Foundation.NSDate
@@ -25,9 +26,13 @@ actual fun VideoRenderer(
     modifier: Modifier,
     onStateChange: ((PlayerState) -> Unit)?,
     onEvent: ((PlayerEvent) -> Unit)?,
+    errorContent: (@Composable (error: PlayerState.Error, retry: () -> Unit) -> Unit)?,
 ): VideoPlayerController {
     var videoView by remember { mutableStateOf<RTCMTLVideoView?>(null) }
     val sessionState by session.state.collectAsState()
+    // Retry runs outside the connect effect: session.retryNow() interrupts the
+    // in-flight attempt itself, so no effect restart is involved.
+    val uiScope = rememberCoroutineScope()
     val connectionStartTime = remember { (NSDate().timeIntervalSince1970 * 1000).toLong() }
     var hasReportedFirstFrame by remember { mutableStateOf(false) }
 
@@ -63,10 +68,13 @@ actual fun VideoRenderer(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            SessionStatusOverlay(sessionState)
-        } else {
-            SessionVideoPlaceholder(sessionState, Modifier)
         }
+        SessionStatusLayer(
+            sessionState = sessionState,
+            hasVideoFrame = view != null,
+            onRetry = { uiScope.launch { session.retryNow() } },
+            errorContent = errorContent
+        )
     }
 
     // Cleanup

@@ -38,3 +38,26 @@ fun WebRTCSession.awaitSettled(
 fun WebRTCSession.launchConnect(): Job {
     return CoroutineScope(Dispatchers.Default).launch { connect() }
 }
+
+/**
+ * Launch retryNow() on a real dispatcher (not TestDispatcher).
+ * Returns the Job for cancellation.
+ */
+fun WebRTCSession.launchRetryNow(): Job {
+    return CoroutineScope(Dispatchers.Default).launch { retryNow() }
+}
+
+/**
+ * Poll a condition in real time until it holds, or fail.
+ *
+ * Real-time polling (not `delay`) so it behaves correctly regardless of whether the
+ * caller is inside `runTest` virtual time, matching [awaitSettled].
+ */
+fun awaitCondition(timeoutMs: Long = 5_000, description: String, predicate: () -> Boolean) {
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (System.currentTimeMillis() < deadline) {
+        if (predicate()) return
+        Thread.sleep(25)
+    }
+    throw AssertionError("Timed out after ${timeoutMs}ms waiting for: $description")
+}

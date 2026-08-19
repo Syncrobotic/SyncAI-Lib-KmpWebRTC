@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.syncrobotic.webrtc.session.SessionState
 import com.syncrobotic.webrtc.session.WebRTCSession
+import kotlinx.coroutines.launch
 import org.webrtc.SurfaceViewRenderer
 
 /**
@@ -24,10 +25,14 @@ actual fun VideoRenderer(
     modifier: Modifier,
     onStateChange: ((PlayerState) -> Unit)?,
     onEvent: ((PlayerEvent) -> Unit)?,
+    errorContent: (@Composable (error: PlayerState.Error, retry: () -> Unit) -> Unit)?,
 ): VideoPlayerController {
     val context = LocalContext.current
     var surfaceViewRenderer by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
     val sessionState by session.state.collectAsState()
+    // Retry runs outside the connect effect: session.retryNow() interrupts the
+    // in-flight attempt itself, so no effect restart is involved.
+    val uiScope = rememberCoroutineScope()
     val connectionStartTime = remember { System.currentTimeMillis() }
     var hasReportedFirstFrame by remember { mutableStateOf(false) }
 
@@ -70,10 +75,13 @@ actual fun VideoRenderer(
                     modifier = Modifier.fillMaxSize()
                 )
             }
-            SessionStatusOverlay(sessionState)
-        } else {
-            SessionVideoPlaceholder(sessionState, Modifier)
         }
+        SessionStatusLayer(
+            sessionState = sessionState,
+            hasVideoFrame = renderer != null,
+            onRetry = { uiScope.launch { session.retryNow() } },
+            errorContent = errorContent
+        )
     }
 
     // Cleanup callback on dispose
