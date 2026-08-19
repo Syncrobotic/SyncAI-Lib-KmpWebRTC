@@ -969,11 +969,12 @@ Built-in connection status overlay — automatically displays connecting/reconne
   appears, so a momentary network hiccup doesn't flash an error at the viewer.
 - A **Retry** button is offered only when `error.isRetryable` — an expired token or a
   malformed offer would fail identically, so no button is shown there.
-- A **prolonged reconnect explains itself.** Under `RetryConfig.PERSISTENT` the session
-  retries without bound and so never reaches `SessionState.Error` — an offline device
-  would otherwise show a bare spinner forever. After 3 attempts or 15s (whichever comes
-  first) the overlay adds "The device may be offline. Retrying automatically." plus the
-  attempt count. Retries continue regardless; this is information, not a state change.
+- A **prolonged reconnect explains itself and becomes actionable.** Under
+  `RetryConfig.PERSISTENT` the session retries without bound and so never reaches
+  `SessionState.Error` — an offline device would otherwise show a bare spinner forever
+  with no way out. After 3 attempts or 15s (whichever comes first) the overlay adds
+  "The device may be offline. Retrying automatically.", the attempt count, and a
+  **Retry now** button. Retries continue regardless; the button just skips the wait.
 
 ```kotlin
 WebRtcUiOptions.reconnectHintAfterAttempts = 3        // default
@@ -1276,6 +1277,29 @@ sealed class SessionState {
     data object Closed : SessionState()
 }
 ```
+
+#### retryNow() — skip the backoff
+
+```kotlin
+suspend fun retryNow()
+```
+
+Interrupts whatever attempt is in flight and starts a fresh one immediately. Unlike
+calling `connect()` again, it works from **any** non-closed state — including
+mid-`Reconnecting`, which is exactly when a user wants it: `RetryConfig.PERSISTENT`
+backs off up to 45s between attempts.
+
+It cancels the running attempt, **waits for it to finish unwinding**, tears the client
+down, then reconnects — so two attempts never touch the underlying client concurrently.
+Concurrent calls are serialised and only the last one's attempt survives, which makes it
+safe to wire straight to a button without debouncing.
+
+```kotlin
+val scope = rememberCoroutineScope()
+Button(onClick = { scope.launch { session.retryNow() } }) { Text("Retry now") }
+```
+
+The built-in overlay already does this; you only need it for custom error UI.
 
 #### SessionErrorKind
 
